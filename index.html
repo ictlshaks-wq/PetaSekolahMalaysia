@@ -404,7 +404,7 @@
       hideError();
 
       // ✅ ikut path awak
-      const res = await fetch('./data/datasekolahmalaysia.csv', { cache:'no-store' });
+      const res = await fetch('https://raw.githubusercontent.com/ictlshaks-wq/PetaSekolahMalaysia/refs/heads/main/datasekolahmalaysia.csv', { cache:'no-store' });
       if(!res.ok) throw new Error('Gagal fetch data: ' + res.status);
 
       const text = await res.text();
@@ -478,3 +478,4 @@
 </script>
 </body>
 </html>
+
