@@ -132,9 +132,9 @@
       #map{height: calc(100vh - 160px);}
     }
 
-    /* ====== POPUP COMPACT + PRASEKOLAH ====== */
+    /* ====== POPUP COMPACT ====== */
     .school-popup{
-      max-width:300px; /* ✅ kecilkan sikit (asal 320px) */
+      max-width:300px; /* ✅ kecilkan sikit */
       padding:12px 14px;
       font-size:13px;
       line-height:1.4;
@@ -193,11 +193,11 @@
       word-break:break-word;
     }
 
-    /* Leaflet popup tweak */
+    /* Leaflet popup tweak (paksa kecil) */
     .leaflet-popup-content{
       margin:10px 12px;
-      width:300px !important;     /* ✅ paksa kecilkan popup */
-      max-width:300px !important; /* ✅ paksa kecilkan popup */
+      width:300px !important;
+      max-width:300px !important;
     }
     @media (max-width:420px){
       .leaflet-popup-content{
@@ -266,17 +266,13 @@
   <script>
     /**
      * =========================
-     * 1) TETAPKAN SUMBER DATA
+     * 1) TETAPKAN SUMBER DATA (CSV)
      * =========================
-     * Format minimum untuk setiap sekolah:
-     * {
-     *   nama, kod, negeri, ppd, peringkat, jenis, gred, sesi, telefon, fax, emel,
-     *   prasekolah, enrolmen_prasekolah, lat, lng
-     * }
-     *
-     * Tukar URL di bawah kepada data tuan (JSON).
+     * CSV mesti ada header.
+     * Minimum lajur disyorkan:
+     * nama,kod,negeri,ppd,peringkat,jenis,gred,sesi,telefon,fax,emel,prasekolah,enrolmen_prasekolah,lat,lng
      */
-    const DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4hR_b6YVHOkWpeWvFVdFYKXLAVeYUOoaDd310UMc6dtXPVq9NuJaIEdU3hEzjgoLk34vaBu9afFCm/pub?output=csv"; // contoh: letak data JSON dalam folder /data
+    const DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4hR_b6YVHOkWpeWvFVdFYKXLAVeYUOoaDd310UMc6dtXPVq9NuJaIEdU3hEzjgoLk34vaBu9afFCm/pub?output=csv"; // ✅ tukar ke CSV
 
     // ====== 2) MAP INIT ======
     const map = L.map("map", { zoomControl: true }).setView([4.2105, 101.9758], 6);
@@ -308,11 +304,9 @@
     const statRendah = document.getElementById("statRendah");
     const statMenengah = document.getElementById("statMenengah");
 
-    // ====== 4) POPUP (COMPACT + PRASEKOLAH) ======
+    // ====== 4) POPUP (kekal + tambah enrolmen prasekolah) ======
     function createPopup(s){
       const sub = `${(s.kod || "-")} • ${(s.jenis || "-")}`;
-
-      // ✅ TAMBAHAN: Enrolmen Prasekolah (field dicadangkan: enrolmen_prasekolah)
       const enrolPra =
         (s.enrolmen_prasekolah ?? s.enrolmenPrasekolah ?? s.enrol_prasekolah ?? s.prasekolah_enrol);
 
@@ -338,14 +332,10 @@
             <div class="row"><span class="label">Fax</span><span class="value">${escapeHtml(s.fax || "Tiada")}</span></div>
             <div class="row"><span class="label">Emel</span><span class="value">${escapeHtml(s.emel || "-")}</span></div>
 
-            <!-- ✅ SEDIA ADA: Status Prasekolah -->
             <div class="row"><span class="label">Prasekolah</span><span class="value">${escapeHtml(s.prasekolah || "Tiada")}</span></div>
 
-            <!-- ✅ TAMBAHAN: Enrolmen Prasekolah -->
-            <div class="row">
-              <span class="label">Enrolmen Prasekolah</span>
-              <span class="value">${escapeHtml((enrolPra ?? "-"))}</span>
-            </div>
+            <!-- ✅ TAMBAHAN: ENROLMEN PRASEKOLAH -->
+            <div class="row"><span class="label">Enrolmen Prasekolah</span><span class="value">${escapeHtml((enrolPra ?? "-"))}</span></div>
           </div>
         </div>
       `;
@@ -360,15 +350,89 @@
         .replaceAll("'","&#039;");
     }
 
-    // ====== 5) LOAD DATA ======
+    // ====== 5) CSV PARSER (tanpa library) ======
+    function parseCSV(text){
+      // parser ringkas, support "quoted field" dan comma dalam quotes
+      const rows = [];
+      let row = [];
+      let cur = "";
+      let inQuotes = false;
+
+      for(let i=0;i<text.length;i++){
+        const ch = text[i];
+        const next = text[i+1];
+
+        if(ch === '"' ){
+          if(inQuotes && next === '"'){ // escaped quote
+            cur += '"';
+            i++;
+          }else{
+            inQuotes = !inQuotes;
+          }
+          continue;
+        }
+
+        if(ch === "," && !inQuotes){
+          row.push(cur);
+          cur = "";
+          continue;
+        }
+
+        if((ch === "\n" || ch === "\r") && !inQuotes){
+          if(ch === "\r" && next === "\n") i++;
+          row.push(cur);
+          rows.push(row);
+          row = [];
+          cur = "";
+          continue;
+        }
+
+        cur += ch;
+      }
+
+      // last cell
+      if(cur.length > 0 || row.length > 0){
+        row.push(cur);
+        rows.push(row);
+      }
+
+      // buang baris kosong
+      return rows.filter(r => r.some(c => String(c).trim() !== ""));
+    }
+
+    function csvToObjects(csvText){
+      const table = parseCSV(csvText);
+      if(table.length === 0) return [];
+      const headers = table[0].map(h => String(h).trim());
+
+      const out = [];
+      for(let i=1;i<table.length;i++){
+        const r = table[i];
+        const o = {};
+        headers.forEach((h,idx)=>{
+          o[h] = (r[idx] ?? "").toString().trim();
+        });
+        out.push(o);
+      }
+      return out;
+    }
+
+    // ====== 6) LOAD DATA (CSV) ======
     async function loadData(){
       try{
         const res = await fetch(DATA_URL, { cache: "no-store" });
         if(!res.ok) throw new Error("Gagal muat data. Semak DATA_URL & hosting path.");
-        const data = await res.json();
+        const csvText = await res.text();
 
-        // Jika data dalam root array
-        allSchools = Array.isArray(data) ? data : (data.data || []);
+        allSchools = csvToObjects(csvText);
+
+        // normalisasi numeric lat/lng (CSV = string)
+        allSchools = allSchools.map(s => ({
+          ...s,
+          lat: Number(s.lat),
+          lng: Number(s.lng),
+          enrolmen_prasekolah: (s.enrolmen_prasekolah === "" ? null : s.enrolmen_prasekolah)
+        }));
 
         buildFilters(allSchools);
         buildMarkers(allSchools);
@@ -379,9 +443,9 @@
       }
     }
 
-    // ====== 6) BUILD FILTER OPTIONS ======
+    // ====== 7) BUILD FILTER OPTIONS ======
     function uniqSorted(arr){
-      return [...new Set(arr.filter(Boolean).map(v => String(v).trim()))]
+      return [...new Set(arr.filter(v => v !== null && v !== undefined && String(v).trim() !== "").map(v => String(v).trim()))]
         .sort((a,b)=> a.localeCompare(b, "ms"));
     }
 
@@ -408,7 +472,6 @@
     }
 
     function refreshPPDOptions(list, negeriValue){
-      // clear
       elPPD.innerHTML = `<option value="">Semua PPD</option>`;
 
       const filtered = negeriValue ? list.filter(s => String(s.negeri||"") === negeriValue) : list;
@@ -421,7 +484,7 @@
       });
     }
 
-    // ====== 7) BUILD MARKERS ======
+    // ====== 8) BUILD MARKERS ======
     function buildMarkers(list){
       cluster.clearLayers();
       markers = [];
@@ -433,14 +496,14 @@
 
         const m = L.marker([lat, lng]);
 
-        /* ✅ kecilkan maxWidth sikit (asal 340) */
+        // ✅ kecilkan maxWidth sikit (asal 340)
         m.bindPopup(createPopup(s), { maxWidth: 300, closeButton: true });
 
         markers.push({ marker: m, data: s });
       });
     }
 
-    // ====== 8) APPLY FILTERS ======
+    // ====== 9) APPLY FILTERS ======
     function normalize(t){ return String(t||"").toLowerCase().trim(); }
 
     function applyFilters(){
@@ -463,11 +526,9 @@
         return true;
       });
 
-      // update map layers
       cluster.clearLayers();
       visible.forEach(v => cluster.addLayer(v.marker));
 
-      // update stats
       const total = visible.length;
       const rendah = visible.filter(v => normalize(v.data.peringkat).includes("rendah")).length;
       const menengah = visible.filter(v => normalize(v.data.peringkat).includes("menengah")).length;
@@ -477,7 +538,6 @@
       statRendah.textContent = rendah;
       statMenengah.textContent = menengah;
 
-      // fit bounds jika ada hasil
       if(total > 0){
         const group = L.featureGroup(visible.map(v => v.marker));
         const b = group.getBounds();
@@ -487,9 +547,8 @@
       }
     }
 
-    // ====== 9) EVENTS ======
+    // ====== 10) EVENTS ======
     elNegeri.addEventListener("change", ()=>{
-      // PPD ikut negeri (dinamik)
       refreshPPDOptions(allSchools, elNegeri.value);
       elPPD.value = "";
       applyFilters();
@@ -520,4 +579,3 @@
   </script>
 </body>
 </html>
-
