@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Peta Digital Sekolah Malaysia</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <style>
+    #map { height: calc(100vh - 160px); }
+    .school-label{
+      background: rgba(255,255,255,.92);
+      border: 1px solid #cbd5e1;
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 900;
+      white-space: nowrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,.12);
+      text-transform: uppercase;
+    }
+    .m-card{
+      width: 38px; height: 38px;
+      border-radius: 12px;
+      background: #fff;
+      display:flex; align-items:center; justify-content:center;
+      box-shadow: 0 12px 24px rgba(0,0,0,.18);
+      border: 1px solid rgba(0,0,0,.06);
+    }
+    .m-ring{
+      width: 32px; height: 32px;
+      border-radius: 10px;
+      border: 2px solid;
+      display:flex; align-items:center; justify-content:center;
+      color: inherit;
+    }
+    #infoPanel{
+      position:absolute;
+      z-index: 1200;
+      top: 84px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 460px;
+      max-width: calc(100vw - 28px);
+    }
+    @media (max-width: 640px){
+      #infoPanel{ top: 126px; width: calc(100vw - 20px); }
+      #map { height: calc(100vh - 200px); }
+    }
+    #loading{
+      position: fixed; inset: 0;
+      z-index: 3000;
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      background: rgba(255,255,255,.96);
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 h-screen overflow-hidden flex flex-col">
+
+  <!-- Loading -->
+  <div id="loading">
+    <div class="relative">
+      <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-600"></div>
+      <div class="absolute inset-0 flex items-center justify-center">
+        <div class="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black">🏫</div>
+      </div>
+    </div>
+    <div id="loadingText" class="mt-5 text-xs font-black tracking-[0.22em] uppercase text-slate-600">
+      Memuatkan data sekolah...
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="err" class="hidden fixed top-3 left-1/2 -translate-x-1/2 z-[3100] bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-xl shadow">
+    Ralat
+  </div>
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 shadow-sm px-4 py-3">
+    <div class="max-w-7xl mx-auto flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow font-black">🏫</div>
+        <div>
+          <div class="font-black tracking-tight uppercase text-slate-900">Peta Digital Sekolah Malaysia</div>
+          <div id="statText" class="text-[11px] font-black text-indigo-600 uppercase tracking-widest">Memuatkan...</div>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-2 items-center justify-end">
+        <select id="fNegeri" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50" onchange="updatePPD()">
+          <option value="">Semua Negeri</option>
+        </select>
+
+        <select id="fPPD" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50" onchange="applyFilter(true)">
+          <option value="">Semua PPD</option>
+        </select>
+
+        <select id="fJenis" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50" onchange="applyFilter(true)">
+          <option value="">Semua Jenis</option>
+        </select>
+
+        <input id="q" class="text-[11px] font-bold border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50 w-56"
+               placeholder="Cari nama / kod..." oninput="applyFilter(false)" />
+
+        <button class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white text-[11px] font-black transition"
+                onclick="resetAll()" title="Reset">
+          Reset
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats -->
+  <div class="bg-white border-b border-slate-200 px-4 py-2 text-xs font-bold">
+    <div class="max-w-7xl mx-auto flex flex-wrap gap-6">
+      <div>Jumlah: <span id="sTotal" class="font-black">0</span></div>
+      <div>Rendah: <span id="sSR" class="font-black">0</span></div>
+      <div>Menengah: <span id="sSM" class="font-black">0</span></div>
+    </div>
+  </div>
+
+  <main class="relative flex-1">
+    <!-- Info Panel -->
+    <div id="infoPanel" class="hidden">
+      <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+        <div class="p-4 flex items-start justify-between gap-3 border-b border-slate-50">
+          <div class="flex items-start gap-3">
+            <div id="ipBadge" class="w-11 h-11 rounded-2xl flex items-center justify-center text-white font-black shadow"
+                 style="background:#2563eb">🏫</div>
+            <div>
+              <div id="ipNama" class="font-black text-slate-900 text-sm uppercase leading-tight">-</div>
+              <div id="ipSub" class="text-[11px] text-slate-500 font-bold">-</div>
+            </div>
+          </div>
+          <button onclick="hideInfo()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white transition flex items-center justify-center font-black">✕</button>
+        </div>
+
+        <div class="p-4">
+          <div class="grid grid-cols-1 gap-2 text-[11px]">
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">NEGERI</span><span id="ipNegeri" class="font-black">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">PPD</span><span id="ipPPD" class="font-black">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">JENIS</span><span id="ipJenis" class="font-black">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">KOD</span><span id="ipKod" class="font-black">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">GRED / LOKASI</span><span id="ipGredLok" class="font-black text-indigo-600">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">SESI</span><span id="ipSesi" class="font-black">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">TELEFON</span><span id="ipTel" class="font-black">-</span></div>
+            <div class="flex flex-col border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">EMEL</span><span id="ipEmail" class="font-black text-blue-600 truncate">-</span></div>
+            <div class="flex justify-between"><span class="text-slate-400 font-bold">MURID / GURU</span><span id="ipMG" class="font-black">-</span></div>
+            <div class="flex justify-between"><span class="text-slate-400 font-bold">PRA/INTEG</span><span id="ipPI" class="font-black">-</span></div>
+          </div>
+
+          <div class="flex gap-2 mt-4">
+            <button id="ipFokus" class="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl text-[11px] font-black uppercase shadow hover:bg-indigo-700 active:scale-95 transition">
+              Fokus Lokasi
+            </button>
+            <a id="ipNav" href="#" target="_blank" class="flex-1 text-center bg-slate-900 text-white py-2.5 rounded-xl text-[11px] font-black uppercase shadow hover:bg-black active:scale-95 transition">
+              Navigasi Peta
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="map" class="w-full h-full"></div>
+  </main>
+
+<script>
+  // ========= Helpers UI
+  function showLoading(on, text){
+    const el = document.getElementById('loading');
+    if (typeof text === 'string') document.getElementById('loadingText').textContent = text;
+    el.style.display = on ? 'flex' : 'none';
+  }
+  function showError(msg){
+    const el = document.getElementById('err');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+  function hideError(){ document.getElementById('err').classList.add('hidden'); }
+
+  // ========= Map
+  const map = L.map('map', { zoomControl:false, wheelPxPerZoomLevel:60 }).setView([4.2, 109.4], 6);
+  L.control.zoom({ position:'bottomright' }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap' }).addTo(map);
+
+  const clusters = L.markerClusterGroup({ spiderfyOnMaxZoom:true, showCoverageOnHover:false, maxClusterRadius:50, disableClusteringAtZoom:15 });
+  map.addLayer(clusters);
+
+  // ========= Data + Filter
+  let allData = [];
+  let negeriMap = {}; // negeri -> Set(ppd)
+
+  // ========= CSV parsing (auto detect delimiter: TAB / , / ;)
+  function detectDelimiter(line){
+    const candidates = ['\t', ',', ';', '|'];
+    let best = '\t', bestCount = -1;
+    for(const d of candidates){
+      const c = line.split(d).length;
+      if(c > bestCount){
+        bestCount = c;
+        best = d;
+      }
+    }
+    return best;
+  }
+
+  function parseTable(text){
+    // buang BOM, normalize line ending
+    text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = text.split('\n').filter(l => l.trim().length);
+    if(!lines.length) return { rows:[], delimiter:'\t' };
+
+    const delimiter = detectDelimiter(lines[0]);
+    const rows = lines.map(line => line.split(delimiter));
+    return { rows, delimiter };
+  }
+
+  function normStr(v){
+    if(v === null || v === undefined) return '';
+    return String(v).trim();
+  }
+  function toNum(v){
+    const s = normStr(v).replace(/,/g,'');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : NaN;
+  }
+
+  // ========= Icon & marker
+  function isSM(s){
+    // guna PERINGKAT jika ada
+    const p = String(s.peringkat||'').toUpperCase();
+    if(p.includes('MENENGAH')) return true;
+    if(p.includes('RENDAH')) return false;
+
+    const j = String(s.jenis||'').toUpperCase();
+    if (j.includes('SM') || j.includes('SMK') || j.includes('SBP') || j.includes('KV') || j.includes('SMA') || j.includes('TEKNIK')) return true;
+
+    const n = String(s.nama||'').toUpperCase();
+    return n.includes('MENENGAH') || n.includes('SMK') || n.includes('KV') || n.includes('SMA') || n.includes('TEKNIK');
+  }
+
+  function iconSvgSR(){
+    return "<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 10l9-6 9 6'/><path d='M5 10v10h14V10'/><path d='M9 20v-6h6v6'/><path d='M9 13h.01'/><path d='M12 13h.01'/><path d='M15 13h.01'/></svg>";
+  }
+  function iconSvgSM(){
+    return "<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 10L12 5 2 10l10 5 10-5z'/><path d='M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5'/><path d='M22 10v6'/></svg>";
+  }
+  function makeIcon(color, sm){
+    return L.divIcon({
+      className:'',
+      html:`<div class="m-card"><div class="m-ring" style="border-color:${color};color:${color}">${sm?iconSvgSM():iconSvgSR()}</div></div>`,
+      iconSize:[38,38],
+      iconAnchor:[19,19]
+    });
+  }
+
+  // ========= Dropdown
+  function clearSelectExceptFirst(sel){
+    while(sel.options.length>1) sel.remove(1);
+  }
+
+  function initFilters(data){
+    negeriMap = {};
+    const negeriSet = new Set();
+    const jenisSet = new Set();
+
+    data.forEach(s=>{
+      const negeri = normStr(s.negeri);
+      const ppd = normStr(s.ppd);
+      const jenis = normStr(s.jenis);
+
+      if(negeri){
+        negeriSet.add(negeri);
+        if(!negeriMap[negeri]) negeriMap[negeri] = new Set();
+        if(ppd) negeriMap[negeri].add(ppd);
+      }
+      if(jenis) jenisSet.add(jenis);
+    });
+
+    const fNegeri = document.getElementById('fNegeri');
+    const fPPD = document.getElementById('fPPD');
+    const fJenis = document.getElementById('fJenis');
+
+    clearSelectExceptFirst(fNegeri);
+    clearSelectExceptFirst(fPPD);
+    clearSelectExceptFirst(fJenis);
+
+    [...negeriSet].sort().forEach(n => fNegeri.add(new Option(n,n)));
+    [...jenisSet].sort().forEach(j => fJenis.add(new Option(j,j)));
+
+    updatePPD();
+  }
+
+  function updatePPD(){
+    const negeri = document.getElementById('fNegeri').value;
+    const fPPD = document.getElementById('fPPD');
+    clearSelectExceptFirst(fPPD);
+
+    if(negeri && negeriMap[negeri]){
+      [...negeriMap[negeri]].sort().forEach(p => fPPD.add(new Option(p,p)));
+    }
+    applyFilter(true);
+  }
+
+  function updateStats(list){
+    const total = list.length;
+    const sm = list.filter(isSM).length;
+    const sr = total - sm;
+    document.getElementById('sTotal').textContent = total;
+    document.getElementById('sSM').textContent = sm;
+    document.getElementById('sSR').textContent = sr;
+    document.getElementById('statText').textContent = `${total} SEKOLAH DITEMUI`;
+  }
+
+  function drawMarkers(list, autoZoom){
+    clusters.clearLayers();
+    updateStats(list);
+
+    const bounds = [];
+    list.forEach(s=>{
+      const lat = Number(s.lat), lng = Number(s.lng);
+      if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+      const sm = isSM(s);
+      const color = sm ? '#dc2626' : '#2563eb';
+      const m = L.marker([lat,lng], { icon: makeIcon(color, sm) });
+
+      m.bindTooltip(String(s.nama||''), { permanent:true, direction:'top', className:'school-label', offset:[0,-16] });
+
+      m.on('click', ()=>showInfo(s, color, sm));
+      clusters.addLayer(m);
+      bounds.push([lat,lng]);
+    });
+
+    if(autoZoom && bounds.length) map.fitBounds(bounds, { padding:[60,60] });
+  }
+
+  function showInfo(s, color, sm){
+    document.getElementById('infoPanel').classList.remove('hidden');
+
+    const badge = document.getElementById('ipBadge');
+    badge.style.background = color;
+    badge.textContent = sm ? '🎓' : '🏫';
+
+    document.getElementById('ipNama').textContent = normStr(s.nama) || '-';
+    document.getElementById('ipSub').textContent  = `${normStr(s.kod)||'-'} • ${normStr(s.jenis)||'-'}`;
+    document.getElementById('ipNegeri').textContent = normStr(s.negeri) || '-';
+    document.getElementById('ipPPD').textContent    = normStr(s.ppd) || '-';
+    document.getElementById('ipJenis').textContent  = normStr(s.jenis) || '-';
+    document.getElementById('ipKod').textContent    = normStr(s.kod) || '-';
+    document.getElementById('ipGredLok').textContent = `${normStr(s.gred)||'-'} / ${normStr(s.lokasi)||'-'}`;
+    document.getElementById('ipSesi').textContent   = normStr(s.sesi) || '-';
+    document.getElementById('ipTel').textContent    = normStr(s.tel) || '-';
+    document.getElementById('ipEmail').textContent  = normStr(s.email) || '-';
+    document.getElementById('ipMG').textContent     = `${(s.enrolmen ?? '-') } / ${(s.guru ?? '-')}`;
+    document.getElementById('ipPI').textContent     = `${normStr(s.prasekolah)||'-'} / ${normStr(s.integrasi)||'-'}`;
+
+    document.getElementById('ipFokus').onclick = () => map.flyTo([s.lat, s.lng], 16, { animate:true, duration:1.2 });
+    document.getElementById('ipNav').href = `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`;
+    map.flyTo([s.lat, s.lng], Math.max(map.getZoom(), 10), { animate:true, duration:0.9 });
+  }
+  function hideInfo(){ document.getElementById('infoPanel').classList.add('hidden'); }
+
+  function applyFilter(autoZoom){
+    const negeri = document.getElementById('fNegeri').value;
+    const ppd    = document.getElementById('fPPD').value;
+    const jenis  = document.getElementById('fJenis').value;
+    const q      = document.getElementById('q').value.trim().toLowerCase();
+
+    const filtered = allData.filter(s=>{
+      const okN = !negeri || normStr(s.negeri) === negeri;
+      const okP = !ppd    || normStr(s.ppd) === ppd;
+      const okJ = !jenis  || normStr(s.jenis) === jenis;
+      const okQ = !q || normStr(s.nama).toLowerCase().includes(q) || normStr(s.kod).toLowerCase().includes(q);
+      return okN && okP && okJ && okQ;
+    });
+
+    drawMarkers(filtered, !!autoZoom);
+  }
+
+  function resetAll(){
+    document.getElementById('fNegeri').value = '';
+    document.getElementById('fPPD').value = '';
+    document.getElementById('fJenis').value = '';
+    document.getElementById('q').value = '';
+    hideInfo();
+    updatePPD();
+  }
+
+  // ========= LOAD TABLE (CSV/TSV)
+  async function loadData(){
+    try{
+      showLoading(true,'Memuatkan data sekolah (CSV/TSV)...');
+      hideError();
+
+      // ✅ ikut path awak
+      const res = await fetch('./data/datasekolahmalaysia.csv', { cache:'no-store' });
+      if(!res.ok) throw new Error('Gagal fetch data: ' + res.status);
+
+      const text = await res.text();
+      const { rows } = parseTable(text);
+      if(!rows.length) throw new Error('Fail data kosong.');
+
+      const headers = rows.shift().map(h => normStr(h));
+      const idx = (name)=> headers.indexOf(name);
+
+      const must = ['NEGERI','PPD','JENIS/LABEL','KODSEKOLAH','NAMASEKOLAH','KOORDINATXX','KOORDINATYY'];
+      const missing = must.filter(m => idx(m) === -1);
+      if(missing.length) throw new Error('Kolum tiada: ' + missing.join(', '));
+
+      // index kolum penting
+      const iNEGERI = idx('NEGERI');
+      const iPPD    = idx('PPD');
+      const iJENIS  = idx('JENIS/LABEL');
+      const iKOD    = idx('KODSEKOLAH');
+      const iNAMA   = idx('NAMASEKOLAH');
+      const iLOKASI = idx('LOKASI');
+      const iGRED   = idx('GRED');
+      const iSESI   = idx('SESI');
+      const iTEL    = idx('NOTELEFON');
+      const iEMAIL  = idx('EMAIL');
+      const iENR    = idx('ENROLMEN');
+      const iGURU   = idx('GURU');
+      const iPRA    = idx('PRASEKOLAH');
+      const iINT    = idx('INTEGRASI');
+      const iPER    = idx('PERINGKAT');
+      const iX      = idx('KOORDINATXX'); // longitude
+      const iY      = idx('KOORDINATYY'); // latitude
+
+      const get = (r,i)=> (i>=0 ? normStr(r[i]) : '');
+
+      allData = rows.map(r=>{
+        const lng = toNum(get(r,iX));
+        const lat = toNum(get(r,iY));
+        return {
+          negeri: get(r,iNEGERI),
+          ppd: get(r,iPPD),
+          jenis: get(r,iJENIS),
+          kod: get(r,iKOD),
+          nama: get(r,iNAMA),
+          lokasi: get(r,iLOKASI) || '-',
+          gred: get(r,iGRED) || '-',
+          sesi: get(r,iSESI) || '-',
+          tel: get(r,iTEL) || '-',
+          email: get(r,iEMAIL) || '-',
+          enrolmen: Number(get(r,iENR)) || 0,
+          guru: Number(get(r,iGURU)) || 0,
+          prasekolah: get(r,iPRA) || '-',
+          integrasi: get(r,iINT) || '-',
+          peringkat: get(r,iPER) || '',
+          lat, lng
+        };
+      }).filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng));
+
+      if(!allData.length) throw new Error('Tiada koordinat sah dalam KOORDINATXX/KOORDINATYY.');
+
+      initFilters(allData);
+      drawMarkers(allData, true);
+      showLoading(false);
+
+    }catch(e){
+      showLoading(false);
+      showError(e.message || String(e));
+    }
+  }
+
+  window.onload = loadData;
+</script>
+</body>
+</html>
