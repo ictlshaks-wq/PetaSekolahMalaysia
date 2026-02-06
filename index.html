@@ -1,164 +1,311 @@
 <!DOCTYPE html>
 <html lang="ms">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Peta Digital Sekolah Malaysia</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Peta Digital Sekolah Malaysia (Google Sheet CSV)</title>
 
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 
-<style>
-#map{height:calc(100vh - 120px)}
-.school-label{
- background:white;border:1px solid #cbd5e1;
- padding:2px 6px;border-radius:6px;
- font-size:10px;font-weight:900;
- text-transform:uppercase
-}
-</style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <!-- CSV parser yang betul -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    #map { height: calc(100vh - 140px); }
+    .school-label{
+      background: rgba(255,255,255,.92);
+      border: 1px solid #cbd5e1;
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 900;
+      white-space: nowrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,.12);
+      text-transform: uppercase;
+    }
+  </style>
 </head>
 
-<body class="bg-slate-50">
+<body class="bg-slate-50 h-screen overflow-hidden flex flex-col">
 
-<header class="bg-white shadow p-3 flex gap-2 flex-wrap">
-<select id="fNegeri" onchange="updatePPD()" class="border px-2 py-1">
-<option value="">Semua Negeri</option>
-</select>
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 shadow-sm px-4 py-3">
+    <div class="max-w-7xl mx-auto flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow font-black">🏫</div>
+        <div>
+          <div class="font-black tracking-tight uppercase text-slate-900">Peta Digital Sekolah Malaysia</div>
+          <div id="statText" class="text-[11px] font-black text-indigo-600 uppercase tracking-widest">Memuatkan...</div>
+        </div>
+      </div>
 
-<select id="fPPD" onchange="applyFilter()" class="border px-2 py-1">
-<option value="">Semua PPD</option>
-</select>
+      <div class="flex flex-wrap gap-2 items-center justify-end">
+        <select id="fNegeri" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50">
+          <option value="">Semua Negeri</option>
+        </select>
 
-<select id="fJenis" onchange="applyFilter()" class="border px-2 py-1">
-<option value="">Semua Jenis</option>
-</select>
+        <select id="fPPD" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50">
+          <option value="">Semua PPD</option>
+        </select>
 
-<input id="q" oninput="applyFilter()" placeholder="Cari sekolah..." class="border px-2 py-1">
-</header>
+        <select id="fJenis" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50">
+          <option value="">Semua Jenis</option>
+        </select>
 
-<div id="map"></div>
+        <input id="q" class="text-[11px] font-bold border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50 w-56"
+               placeholder="Cari nama / kod..." />
+
+        <button id="btnReset" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white text-[11px] font-black transition">
+          Reset
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats -->
+  <div class="bg-white border-b border-slate-200 px-4 py-2 text-xs font-bold">
+    <div class="max-w-7xl mx-auto flex flex-wrap gap-6">
+      <div>Jumlah: <span id="sTotal" class="font-black">0</span></div>
+      <div>Rendah: <span id="sSR" class="font-black">0</span></div>
+      <div>Menengah: <span id="sSM" class="font-black">0</span></div>
+      <div class="text-slate-500">Dibuang (koordinat tak sah): <span id="sDrop" class="font-black">0</span></div>
+    </div>
+  </div>
+
+  <main class="relative flex-1">
+    <div id="map" class="w-full h-full"></div>
+  </main>
 
 <script>
-// =====================
-// TUKAR LINK CSV SINI
-// =====================
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4hR_b6YVHOkWpeWvFVdFYKXLAVeYUOoaDd310UMc6dtXPVq9NuJaIEdU3hEzjgoLk34vaBu9afFCm/pub?output=csv";
+  // =====================
+  // TUKAR LINK CSV DI SINI
+  // Pastikan link ada: output=csv
+  // =====================
+  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4hR_b6YVHOkWpeWvFVdFYKXLAVeYUOoaDd310UMc6dtXPVq9NuJaIEdU3hEzjgoLk34vaBu9afFCm/pub?output=csv";
 
-// =====================
-const map = L.map('map').setView([4.5,102],7);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-const clusters = L.markerClusterGroup();
-map.addLayer(clusters);
+  // Julat munasabah Malaysia (untuk buang data pelik)
+  const MALAYSIA_BOUNDS = {
+    latMin: 0.5, latMax: 7.8,
+    lngMin: 99.0, lngMax: 120.5
+  };
 
-let allData=[];
-let negeriMap={};
+  // ===== map
+  const map = L.map('map', { zoomControl:true }).setView([4.2, 109.4], 6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap' }).addTo(map);
+  const clusters = L.markerClusterGroup({ showCoverageOnHover:false, maxClusterRadius:50, disableClusteringAtZoom:15 });
+  map.addLayer(clusters);
 
-function parseCSV(text){
- const lines=text.trim().split("\n");
- const headers=lines[0].split(",");
- return lines.slice(1).map(row=>{
-  const cols=row.split(",");
-  let obj={};
-  headers.forEach((h,i)=>obj[h.trim()]=cols[i]?.trim());
-  return obj;
- });
-}
+  // ===== state
+  let allData = [];
+  let negeriMap = {}; // negeri -> Set(ppd)
 
-function toNum(v){
- if(!v) return NaN;
- return Number(String(v).replace(",","."));
-}
+  const elNegeri = document.getElementById('fNegeri');
+  const elPPD = document.getElementById('fPPD');
+  const elJenis = document.getElementById('fJenis');
+  const elQ = document.getElementById('q');
 
-async function loadData(){
- const res=await fetch(CSV_URL+"&_="+Date.now());
- const txt=await res.text();
- const rows=parseCSV(txt);
+  function toNum(v){
+    if (v === null || v === undefined) return NaN;
+    const s = String(v).trim();
+    if (!s) return NaN;
+    // buang ruang, tukar comma decimal (jika ada) -> dot
+    const cleaned = s.replace(/\s+/g,'').replace(',', '.');
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : NaN;
+  }
 
- allData=rows.map(r=>({
-  negeri:r["NEGERI"],
-  ppd:r["PPD"],
-  jenis:r["JENIS/LABEL"],
-  kod:r["KODSEKOLAH"],
-  nama:r["NAMASEKOLAH"],
-  lat:toNum(r["KOORDINATYY"]),
-  lng:toNum(r["KOORDINATXX"])
- })).filter(s=>Number.isFinite(s.lat)&&Number.isFinite(s.lng));
+  function isInMalaysia(lat,lng){
+    return lat>=MALAYSIA_BOUNDS.latMin && lat<=MALAYSIA_BOUNDS.latMax &&
+           lng>=MALAYSIA_BOUNDS.lngMin && lng<=MALAYSIA_BOUNDS.lngMax;
+  }
 
- initFilters();
- draw(allData);
-}
+  function isSM(s){
+    const j = String(s.jenis||'').toUpperCase();
+    if (j.includes('SM') || j.includes('SMK') || j.includes('SBP') || j.includes('KV') || j.includes('SMA') || j.includes('TEKNIK')) return true;
+    const n = String(s.nama||'').toUpperCase();
+    return n.includes('MENENGAH') || n.includes('SMK') || n.includes('KV') || n.includes('SMA') || n.includes('TEKNIK');
+  }
 
-function initFilters(){
- negeriMap={};
- const negeriSet=new Set();
- const jenisSet=new Set();
+  function clearSelectExceptFirst(sel){
+    while(sel.options.length>1) sel.remove(1);
+  }
 
- allData.forEach(s=>{
-  negeriSet.add(s.negeri);
-  jenisSet.add(s.jenis);
-  if(!negeriMap[s.negeri]) negeriMap[s.negeri]=new Set();
-  negeriMap[s.negeri].add(s.ppd);
- });
+  function initFilters(){
+    negeriMap = {};
+    const negeriSet = new Set();
+    const jenisSet  = new Set();
 
- const fNeg=document.getElementById("fNegeri");
- const fPPD=document.getElementById("fPPD");
- const fJenis=document.getElementById("fJenis");
+    allData.forEach(s=>{
+      if (s.negeri) negeriSet.add(s.negeri);
+      if (s.jenis)  jenisSet.add(s.jenis);
 
- while(fNeg.options.length>1)fNeg.remove(1);
- while(fPPD.options.length>1)fPPD.remove(1);
- while(fJenis.options.length>1)fJenis.remove(1);
+      if (s.negeri){
+        if(!negeriMap[s.negeri]) negeriMap[s.negeri] = new Set();
+        if (s.ppd) negeriMap[s.negeri].add(s.ppd);
+      }
+    });
 
- [...negeriSet].sort().forEach(n=>fNeg.add(new Option(n,n)));
- [...jenisSet].sort().forEach(j=>fJenis.add(new Option(j,j)));
-}
+    clearSelectExceptFirst(elNegeri);
+    clearSelectExceptFirst(elPPD);
+    clearSelectExceptFirst(elJenis);
 
-function updatePPD(){
- const negeri=fNegeri.value;
- const fPPD=document.getElementById("fPPD");
- while(fPPD.options.length>1)fPPD.remove(1);
- if(negeri && negeriMap[negeri]){
-  [...negeriMap[negeri]].sort().forEach(p=>fPPD.add(new Option(p,p)));
- }
- applyFilter();
-}
+    [...negeriSet].sort().forEach(n => elNegeri.add(new Option(n,n)));
+    [...jenisSet].sort().forEach(j => elJenis.add(new Option(j,j)));
 
-function draw(list){
- clusters.clearLayers();
- list.forEach(s=>{
-  const isSM=s.jenis?.toUpperCase().includes("SM");
-  const color=isSM?"#dc2626":"#2563eb";
+    updatePPD();
+  }
 
-  const icon=L.divIcon({
-   html:`<div style="background:white;border:2px solid ${color};border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:${color}">🏫</div>`,
-   iconSize:[34,34]
+  function updatePPD(){
+    const negeri = elNegeri.value;
+    clearSelectExceptFirst(elPPD);
+
+    if(negeri && negeriMap[negeri]){
+      [...negeriMap[negeri]].sort().forEach(p => elPPD.add(new Option(p,p)));
+    }
+    applyFilter(true);
+  }
+
+  function updateStats(list, dropped){
+    const total = list.length;
+    const sm = list.filter(isSM).length;
+    const sr = total - sm;
+
+    document.getElementById('sTotal').textContent = total;
+    document.getElementById('sSM').textContent = sm;
+    document.getElementById('sSR').textContent = sr;
+    document.getElementById('sDrop').textContent = dropped;
+
+    document.getElementById('statText').textContent = total ? `${total} SEKOLAH DITEMUI` : 'TIADA DATA';
+  }
+
+  function drawMarkers(list, autoZoom){
+    clusters.clearLayers();
+
+    const bounds = [];
+    list.forEach(s=>{
+      const lat = s.lat, lng = s.lng;
+      const sm = isSM(s);
+      const color = sm ? '#dc2626' : '#2563eb';
+
+      const icon = L.divIcon({
+        className:'',
+        html:`<div style="background:#fff;border:2px solid ${color};border-radius:12px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-weight:900;color:${color}">${sm?'🎓':'🏫'}</div>`,
+        iconSize:[34,34],
+        iconAnchor:[17,17]
+      });
+
+      const m = L.marker([lat,lng], { icon });
+      m.bindTooltip(String(s.nama||''), { permanent:false, direction:'top', className:'school-label', offset:[0,-12] });
+
+      m.on('click', ()=>{
+        // fokus bila klik
+        map.flyTo([lat,lng], Math.max(map.getZoom(), 12), { animate:true, duration:0.8 });
+      });
+
+      clusters.addLayer(m);
+      bounds.push([lat,lng]);
+    });
+
+    if(autoZoom && bounds.length){
+      map.fitBounds(bounds, { padding:[40,40] });
+    }
+  }
+
+  function applyFilter(autoZoom){
+    const negeri = elNegeri.value;
+    const ppd = elPPD.value;
+    const jenis = elJenis.value;
+    const q = elQ.value.trim().toLowerCase();
+
+    const filtered = allData.filter(s=>{
+      const okN = !negeri || s.negeri === negeri;
+      const okP = !ppd || s.ppd === ppd;
+      const okJ = !jenis || s.jenis === jenis;
+      const okQ = !q || (String(s.nama||'').toLowerCase().includes(q) || String(s.kod||'').toLowerCase().includes(q));
+      return okN && okP && okJ && okQ;
+    });
+
+    updateStats(filtered, window.__droppedCount || 0);
+    drawMarkers(filtered, !!autoZoom);
+  }
+
+  function resetAll(){
+    elNegeri.value = '';
+    elPPD.value = '';
+    elJenis.value = '';
+    elQ.value = '';
+    updatePPD();
+  }
+
+  async function loadData(){
+    document.getElementById('statText').textContent = 'MEMUATKAN...';
+
+    const url = CSV_URL + (CSV_URL.includes('?') ? '&' : '?') + '_=' + Date.now();
+    const res = await fetch(url, { cache:'no-store' });
+    if(!res.ok) throw new Error('Gagal fetch CSV: ' + res.status);
+
+    const csvText = await res.text();
+
+    // PapaParse handle CSV yang ada koma + double quote dengan betul
+    const parsed = Papa.parse(csvText, {
+      header: true,
+      skipEmptyLines: true
+    });
+
+    if(parsed.errors && parsed.errors.length){
+      console.warn("PapaParse errors:", parsed.errors.slice(0,5));
+    }
+
+    const rows = Array.isArray(parsed.data) ? parsed.data : [];
+    let dropped = 0;
+
+    allData = rows.map(r=>{
+      // ikut header awak
+      const lng = toNum(r["KOORDINATXX"]); // longitude
+      const lat = toNum(r["KOORDINATYY"]); // latitude
+
+      const obj = {
+        negeri: (r["NEGERI"]||'').trim(),
+        ppd: (r["PPD"]||'').trim(),
+        jenis: (r["JENIS/LABEL"]||'').trim(),
+        kod: (r["KODSEKOLAH"]||'').trim(),
+        nama: (r["NAMASEKOLAH"]||'').trim(),
+        lat, lng
+      };
+
+      return obj;
+    }).filter(s=>{
+      const ok = Number.isFinite(s.lat) && Number.isFinite(s.lng) && isInMalaysia(s.lat, s.lng);
+      if(!ok) dropped++;
+      return ok;
+    });
+
+    window.__droppedCount = dropped;
+
+    initFilters();
+    applyFilter(true);
+  }
+
+  // events
+  elNegeri.addEventListener('change', updatePPD);
+  elPPD.addEventListener('change', ()=>applyFilter(true));
+  elJenis.addEventListener('change', ()=>applyFilter(true));
+  elQ.addEventListener('input', ()=>applyFilter(false));
+  document.getElementById('btnReset').addEventListener('click', resetAll);
+
+  loadData().catch(err=>{
+    console.error(err);
+    document.getElementById('statText').textContent = 'RALAT DATA';
+    alert(err.message || String(err));
   });
-
-  const m=L.marker([s.lat,s.lng],{icon});
-  m.bindTooltip(s.nama,{permanent:true,className:"school-label",direction:"top"});
-  clusters.addLayer(m);
- });
-}
-
-function applyFilter(){
- const n=fNegeri.value;
- const p=fPPD.value;
- const j=fJenis.value;
- const q=document.getElementById("q").value.toLowerCase();
-
- const f=allData.filter(s=>
-  (!n||s.negeri===n)&&
-  (!p||s.ppd===p)&&
-  (!j||s.jenis===j)&&
-  (!q||s.nama.toLowerCase().includes(q)||s.kod.toLowerCase().includes(q))
- );
- draw(f);
-}
-
-loadData();
 </script>
+
 </body>
 </html>
