@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Peta Digital Sekolah Malaysia (Google Sheet CSV)</title>
+  <title>Peta Digital Sekolah Malaysia</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
 
@@ -14,11 +14,8 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
-  <!-- CSV parser yang betul -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-
   <style>
-    #map { height: calc(100vh - 140px); }
+    #map { height: calc(100vh - 120px); }
     .school-label{
       background: rgba(255,255,255,.92);
       border: 1px solid #cbd5e1;
@@ -30,101 +27,125 @@
       box-shadow: 0 2px 10px rgba(0,0,0,.12);
       text-transform: uppercase;
     }
+    #infoPanel{
+      position:absolute;
+      z-index: 1200;
+      top: 84px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 520px;
+      max-width: calc(100vw - 24px);
+    }
+    @media (max-width: 640px){
+      #infoPanel{ top: 126px; width: calc(100vw - 16px); }
+      #map { height: calc(100vh - 160px); }
+    }
   </style>
 </head>
 
 <body class="bg-slate-50 h-screen overflow-hidden flex flex-col">
 
-  <!-- Header -->
-  <header class="bg-white border-b border-slate-200 shadow-sm px-4 py-3">
-    <div class="max-w-7xl mx-auto flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow font-black">🏫</div>
-        <div>
-          <div class="font-black tracking-tight uppercase text-slate-900">Peta Digital Sekolah Malaysia</div>
-          <div id="statText" class="text-[11px] font-black text-indigo-600 uppercase tracking-widest">Memuatkan...</div>
-        </div>
-      </div>
-
-      <div class="flex flex-wrap gap-2 items-center justify-end">
-        <select id="fNegeri" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50">
-          <option value="">Semua Negeri</option>
-        </select>
-
-        <select id="fPPD" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50">
-          <option value="">Semua PPD</option>
-        </select>
-
-        <select id="fJenis" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50">
-          <option value="">Semua Jenis</option>
-        </select>
-
-        <input id="q" class="text-[11px] font-bold border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50 w-56"
-               placeholder="Cari nama / kod..." />
-
-        <button id="btnReset" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white text-[11px] font-black transition">
-          Reset
-        </button>
+<header class="bg-white border-b border-slate-200 shadow-sm px-3 py-3">
+  <div class="max-w-7xl mx-auto flex flex-col lg:flex-row gap-2 lg:items-center lg:justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black">🏫</div>
+      <div>
+        <div class="font-black tracking-tight uppercase text-slate-900">Peta Digital Sekolah Malaysia</div>
+        <div id="statText" class="text-[11px] font-black text-indigo-600 uppercase tracking-widest">Memuatkan...</div>
       </div>
     </div>
-  </header>
 
-  <!-- Stats -->
-  <div class="bg-white border-b border-slate-200 px-4 py-2 text-xs font-bold">
-    <div class="max-w-7xl mx-auto flex flex-wrap gap-6">
-      <div>Jumlah: <span id="sTotal" class="font-black">0</span></div>
-      <div>Rendah: <span id="sSR" class="font-black">0</span></div>
-      <div>Menengah: <span id="sSM" class="font-black">0</span></div>
-      <div class="text-slate-500">Dibuang (koordinat tak sah): <span id="sDrop" class="font-black">0</span></div>
+    <div class="flex flex-wrap gap-2 items-center justify-end">
+      <select id="fNegeri" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50" onchange="updatePPD()">
+        <option value="">Semua Negeri</option>
+      </select>
+
+      <select id="fPPD" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50" onchange="applyFilter(true)">
+        <option value="">Semua PPD</option>
+      </select>
+
+      <select id="fJenis" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50" onchange="applyFilter(true)">
+        <option value="">Semua Jenis</option>
+      </select>
+
+      <input id="q" class="text-[11px] font-bold border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50 w-56"
+             placeholder="Cari nama / kod..." oninput="applyFilter(false)" />
+
+      <button class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white text-[11px] font-black transition"
+              onclick="resetAll()" title="Reset">
+        Reset
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Stats ringkas -->
+<div class="bg-white border-b border-slate-200 px-4 py-2 text-xs font-bold">
+  <div class="max-w-7xl mx-auto flex flex-wrap gap-6">
+    <div>Jumlah: <span id="sTotal" class="font-black">0</span></div>
+    <div>Rendah: <span id="sSR" class="font-black">0</span></div>
+    <div>Menengah: <span id="sSM" class="font-black">0</span></div>
+  </div>
+</div>
+
+<main class="relative flex-1">
+  <!-- Info Panel -->
+  <div id="infoPanel" class="hidden">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+      <div class="p-4 flex items-start justify-between gap-3 border-b border-slate-50">
+        <div class="flex items-start gap-3">
+          <div id="ipBadge" class="w-11 h-11 rounded-2xl flex items-center justify-center text-white font-black shadow"
+               style="background:#2563eb">🏫</div>
+          <div>
+            <div id="ipNama" class="font-black text-slate-900 text-sm uppercase leading-tight">-</div>
+            <div id="ipSub" class="text-[11px] text-slate-500 font-bold">-</div>
+          </div>
+        </div>
+        <button onclick="hideInfo()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white transition flex items-center justify-center font-black">✕</button>
+      </div>
+
+      <div class="p-4">
+        <div class="grid grid-cols-1 gap-2 text-[11px]">
+          <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">NEGERI</span><span id="ipNegeri" class="font-black">-</span></div>
+          <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">PPD</span><span id="ipPPD" class="font-black">-</span></div>
+          <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">JENIS</span><span id="ipJenis" class="font-black">-</span></div>
+          <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">KOD</span><span id="ipKod" class="font-black">-</span></div>
+          <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">GRED / LOKASI</span><span id="ipGredLok" class="font-black text-indigo-600">-</span></div>
+          <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">SESI</span><span id="ipSesi" class="font-black">-</span></div>
+          <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">TELEFON</span><span id="ipTel" class="font-black">-</span></div>
+          <div class="flex flex-col border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">EMEL</span><a id="ipEmail" href="#" class="font-black text-blue-600 truncate">-</a></div>
+          <div class="flex justify-between"><span class="text-slate-400 font-bold">MURID / GURU</span><span id="ipMG" class="font-black">-</span></div>
+        </div>
+
+        <div class="flex gap-2 mt-4">
+          <button id="ipFokus" class="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl text-[11px] font-black uppercase shadow hover:bg-indigo-700 active:scale-95 transition">
+            Fokus Lokasi
+          </button>
+          <a id="ipNav" href="#" target="_blank" class="flex-1 text-center bg-slate-900 text-white py-2.5 rounded-xl text-[11px] font-black uppercase shadow hover:bg-black active:scale-95 transition">
+            Navigasi Peta
+          </a>
+        </div>
+      </div>
     </div>
   </div>
 
-  <main class="relative flex-1">
-    <div id="map" class="w-full h-full"></div>
-  </main>
+  <div id="map" class="w-full h-full"></div>
+</main>
 
 <script>
-  // =====================
-  // TUKAR LINK CSV DI SINI
-  // Pastikan link ada: output=csv
-  // =====================
+  // ====== TUKAR LINK CSV GOOGLE SHEET DI SINI
   const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4hR_b6YVHOkWpeWvFVdFYKXLAVeYUOoaDd310UMc6dtXPVq9NuJaIEdU3hEzjgoLk34vaBu9afFCm/pub?output=csv";
 
-  // Julat munasabah Malaysia (untuk buang data pelik)
-  const MALAYSIA_BOUNDS = {
-    latMin: 0.5, latMax: 7.8,
-    lngMin: 99.0, lngMax: 120.5
-  };
-
-  // ===== map
-  const map = L.map('map', { zoomControl:true }).setView([4.2, 109.4], 6);
+  // ====== map
+  const map = L.map('map', { zoomControl:false, wheelPxPerZoomLevel:60 }).setView([4.2, 109.4], 6);
+  L.control.zoom({ position:'bottomright' }).addTo(map);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap' }).addTo(map);
-  const clusters = L.markerClusterGroup({ showCoverageOnHover:false, maxClusterRadius:50, disableClusteringAtZoom:15 });
+
+  const clusters = L.markerClusterGroup({ spiderfyOnMaxZoom:true, showCoverageOnHover:false, maxClusterRadius:50, disableClusteringAtZoom:15 });
   map.addLayer(clusters);
 
-  // ===== state
   let allData = [];
   let negeriMap = {}; // negeri -> Set(ppd)
-
-  const elNegeri = document.getElementById('fNegeri');
-  const elPPD = document.getElementById('fPPD');
-  const elJenis = document.getElementById('fJenis');
-  const elQ = document.getElementById('q');
-
-  function toNum(v){
-    if (v === null || v === undefined) return NaN;
-    const s = String(v).trim();
-    if (!s) return NaN;
-    // buang ruang, tukar comma decimal (jika ada) -> dot
-    const cleaned = s.replace(/\s+/g,'').replace(',', '.');
-    const n = Number(cleaned);
-    return Number.isFinite(n) ? n : NaN;
-  }
-
-  function isInMalaysia(lat,lng){
-    return lat>=MALAYSIA_BOUNDS.latMin && lat<=MALAYSIA_BOUNDS.latMax &&
-           lng>=MALAYSIA_BOUNDS.lngMin && lng<=MALAYSIA_BOUNDS.lngMax;
-  }
 
   function isSM(s){
     const j = String(s.jenis||'').toUpperCase();
@@ -133,178 +154,265 @@
     return n.includes('MENENGAH') || n.includes('SMK') || n.includes('KV') || n.includes('SMA') || n.includes('TEKNIK');
   }
 
+  function makeIcon(color, sm){
+    return L.divIcon({
+      className:'',
+      html:`<div style="width:38px;height:38px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 24px rgba(0,0,0,.18);border:1px solid rgba(0,0,0,.06)">
+              <div style="width:32px;height:32px;border-radius:10px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;color:${color};font-weight:900">
+                ${sm ? "🎓" : "🏫"}
+              </div>
+            </div>`,
+      iconSize:[38,38],
+      iconAnchor:[19,19]
+    });
+  }
+
   function clearSelectExceptFirst(sel){
     while(sel.options.length>1) sel.remove(1);
   }
 
-  function initFilters(){
+  // CSV parser yang betul (support comma dalam teks + quote)
+  function parseCSV(text){
+    const rows = [];
+    let row = [];
+    let cur = '';
+    let inQuotes = false;
+
+    for (let i=0; i<text.length; i++){
+      const c = text[i];
+      const next = text[i+1];
+
+      if (c === '"' ){
+        if (inQuotes && next === '"'){ cur += '"'; i++; }
+        else inQuotes = !inQuotes;
+        continue;
+      }
+
+      if (c === ',' && !inQuotes){
+        row.push(cur); cur=''; continue;
+      }
+
+      if ((c === '\n' || c === '\r') && !inQuotes){
+        if (c === '\r' && next === '\n') i++;
+        row.push(cur); cur='';
+        if (row.length > 1 || row[0] !== '') rows.push(row);
+        row = [];
+        continue;
+      }
+
+      cur += c;
+    }
+    if (cur.length || row.length){
+      row.push(cur);
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function normHeader(h){
+    return String(h||'').trim().replace(/\s+/g,' ').toUpperCase();
+  }
+
+  function toNum(v){
+    if (v === null || v === undefined) return NaN;
+    const s = String(v).trim();
+    if (!s) return NaN;
+    const clean = s.replace(/,/g,''); // buang koma ribu
+    return Number(clean);
+  }
+
+  function initFilters(data){
     negeriMap = {};
     const negeriSet = new Set();
-    const jenisSet  = new Set();
+    const jenisSet = new Set();
 
-    allData.forEach(s=>{
-      if (s.negeri) negeriSet.add(s.negeri);
-      if (s.jenis)  jenisSet.add(s.jenis);
+    data.forEach(s=>{
+      const negeri = String(s.negeri||'').trim();
+      const ppd = String(s.ppd||'').trim();
+      const jenis = String(s.jenis||'').trim();
 
-      if (s.negeri){
-        if(!negeriMap[s.negeri]) negeriMap[s.negeri] = new Set();
-        if (s.ppd) negeriMap[s.negeri].add(s.ppd);
+      if(negeri){
+        negeriSet.add(negeri);
+        if(!negeriMap[negeri]) negeriMap[negeri] = new Set();
+        if(ppd) negeriMap[negeri].add(ppd);
       }
+      if(jenis) jenisSet.add(jenis);
     });
 
-    clearSelectExceptFirst(elNegeri);
-    clearSelectExceptFirst(elPPD);
-    clearSelectExceptFirst(elJenis);
+    const fNegeri = document.getElementById('fNegeri');
+    const fPPD = document.getElementById('fPPD');
+    const fJenis = document.getElementById('fJenis');
 
-    [...negeriSet].sort().forEach(n => elNegeri.add(new Option(n,n)));
-    [...jenisSet].sort().forEach(j => elJenis.add(new Option(j,j)));
+    clearSelectExceptFirst(fNegeri);
+    clearSelectExceptFirst(fPPD);
+    clearSelectExceptFirst(fJenis);
+
+    [...negeriSet].sort().forEach(n => fNegeri.add(new Option(n,n)));
+    [...jenisSet].sort().forEach(j => fJenis.add(new Option(j,j)));
 
     updatePPD();
   }
 
   function updatePPD(){
-    const negeri = elNegeri.value;
-    clearSelectExceptFirst(elPPD);
+    const negeri = document.getElementById('fNegeri').value;
+    const fPPD = document.getElementById('fPPD');
+    clearSelectExceptFirst(fPPD);
 
     if(negeri && negeriMap[negeri]){
-      [...negeriMap[negeri]].sort().forEach(p => elPPD.add(new Option(p,p)));
+      [...negeriMap[negeri]].sort().forEach(p => fPPD.add(new Option(p,p)));
     }
     applyFilter(true);
   }
 
-  function updateStats(list, dropped){
+  function updateStats(list){
     const total = list.length;
     const sm = list.filter(isSM).length;
     const sr = total - sm;
-
     document.getElementById('sTotal').textContent = total;
     document.getElementById('sSM').textContent = sm;
     document.getElementById('sSR').textContent = sr;
-    document.getElementById('sDrop').textContent = dropped;
-
-    document.getElementById('statText').textContent = total ? `${total} SEKOLAH DITEMUI` : 'TIADA DATA';
+    document.getElementById('statText').textContent = `${total} SEKOLAH DITEMUI`;
   }
 
   function drawMarkers(list, autoZoom){
     clusters.clearLayers();
+    updateStats(list);
 
     const bounds = [];
     list.forEach(s=>{
-      const lat = s.lat, lng = s.lng;
+      if(!Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
+
       const sm = isSM(s);
       const color = sm ? '#dc2626' : '#2563eb';
+      const m = L.marker([s.lat, s.lng], { icon: makeIcon(color, sm) });
 
-      const icon = L.divIcon({
-        className:'',
-        html:`<div style="background:#fff;border:2px solid ${color};border-radius:12px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-weight:900;color:${color}">${sm?'🎓':'🏫'}</div>`,
-        iconSize:[34,34],
-        iconAnchor:[17,17]
-      });
-
-      const m = L.marker([lat,lng], { icon });
-      m.bindTooltip(String(s.nama||''), { permanent:false, direction:'top', className:'school-label', offset:[0,-12] });
-
-      m.on('click', ()=>{
-        // fokus bila klik
-        map.flyTo([lat,lng], Math.max(map.getZoom(), 12), { animate:true, duration:0.8 });
-      });
+      m.bindTooltip(String(s.nama||''), { permanent:true, direction:'top', className:'school-label', offset:[0,-16] });
+      m.on('click', ()=>showInfo(s, color, sm));
 
       clusters.addLayer(m);
-      bounds.push([lat,lng]);
+      bounds.push([s.lat, s.lng]);
     });
 
-    if(autoZoom && bounds.length){
-      map.fitBounds(bounds, { padding:[40,40] });
-    }
+    if(autoZoom && bounds.length) map.fitBounds(bounds, { padding:[60,60] });
   }
 
+  function showInfo(s, color, sm){
+    document.getElementById('infoPanel').classList.remove('hidden');
+
+    const badge = document.getElementById('ipBadge');
+    badge.style.background = color;
+    badge.textContent = sm ? '🎓' : '🏫';
+
+    document.getElementById('ipNama').textContent = String(s.nama||'-');
+    document.getElementById('ipSub').textContent = `${String(s.kod||'-')} • ${String(s.jenis||'-')}`;
+    document.getElementById('ipNegeri').textContent = String(s.negeri||'-');
+    document.getElementById('ipPPD').textContent = String(s.ppd||'-');
+    document.getElementById('ipJenis').textContent = String(s.jenis||'-');
+    document.getElementById('ipKod').textContent = String(s.kod||'-');
+    document.getElementById('ipGredLok').textContent = `${String(s.gred||'-')} / ${String(s.lokasi||'-')}`;
+    document.getElementById('ipSesi').textContent = String(s.sesi||'-');
+    document.getElementById('ipTel').textContent = String(s.tel||'-') || 'TIADA';
+
+    const emailEl = document.getElementById('ipEmail');
+    const email = String(s.email||'-');
+    emailEl.textContent = email;
+    emailEl.href = email && email !== '-' ? `mailto:${email}` : '#';
+
+    document.getElementById('ipMG').textContent = `${String(s.enrolmen ?? '-') } / ${String(s.guru ?? '-')}`;
+
+    document.getElementById('ipFokus').onclick = () => map.flyTo([s.lat, s.lng], 16, { animate:true, duration:1.1 });
+    document.getElementById('ipNav').href = `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`;
+
+    map.flyTo([s.lat, s.lng], Math.max(map.getZoom(), 10), { animate:true, duration:0.8 });
+  }
+
+  function hideInfo(){ document.getElementById('infoPanel').classList.add('hidden'); }
+
   function applyFilter(autoZoom){
-    const negeri = elNegeri.value;
-    const ppd = elPPD.value;
-    const jenis = elJenis.value;
-    const q = elQ.value.trim().toLowerCase();
+    const negeri = document.getElementById('fNegeri').value;
+    const ppd = document.getElementById('fPPD').value;
+    const jenis = document.getElementById('fJenis').value;
+    const q = document.getElementById('q').value.trim().toLowerCase();
 
     const filtered = allData.filter(s=>{
-      const okN = !negeri || s.negeri === negeri;
-      const okP = !ppd || s.ppd === ppd;
-      const okJ = !jenis || s.jenis === jenis;
-      const okQ = !q || (String(s.nama||'').toLowerCase().includes(q) || String(s.kod||'').toLowerCase().includes(q));
+      const okN = !negeri || String(s.negeri||'').trim() === negeri;
+      const okP = !ppd || String(s.ppd||'').trim() === ppd;
+      const okJ = !jenis || String(s.jenis||'').trim() === jenis;
+      const okQ = !q || String(s.nama||'').toLowerCase().includes(q) || String(s.kod||'').toLowerCase().includes(q);
       return okN && okP && okJ && okQ;
     });
 
-    updateStats(filtered, window.__droppedCount || 0);
     drawMarkers(filtered, !!autoZoom);
   }
 
   function resetAll(){
-    elNegeri.value = '';
-    elPPD.value = '';
-    elJenis.value = '';
-    elQ.value = '';
+    document.getElementById('fNegeri').value = '';
+    document.getElementById('fPPD').value = '';
+    document.getElementById('fJenis').value = '';
+    document.getElementById('q').value = '';
+    hideInfo();
     updatePPD();
   }
 
-  async function loadData(){
-    document.getElementById('statText').textContent = 'MEMUATKAN...';
-
+  async function loadCSV(){
     const url = CSV_URL + (CSV_URL.includes('?') ? '&' : '?') + '_=' + Date.now();
     const res = await fetch(url, { cache:'no-store' });
     if(!res.ok) throw new Error('Gagal fetch CSV: ' + res.status);
+    const text = await res.text();
 
-    const csvText = await res.text();
+    const table = parseCSV(text);
+    if(!table.length) throw new Error('CSV kosong');
 
-    // PapaParse handle CSV yang ada koma + double quote dengan betul
-    const parsed = Papa.parse(csvText, {
-      header: true,
-      skipEmptyLines: true
-    });
+    const headersRaw = table[0];
+    const headers = headersRaw.map(normHeader);
 
-    if(parsed.errors && parsed.errors.length){
-      console.warn("PapaParse errors:", parsed.errors.slice(0,5));
-    }
+    const idx = (name) => headers.indexOf(normHeader(name));
 
-    const rows = Array.isArray(parsed.data) ? parsed.data : [];
-    let dropped = 0;
+    const iNEGERI = idx('NEGERI');
+    const iPPD = idx('PPD');
+    const iJENIS = idx('JENIS/LABEL');
+    const iKOD = idx('KODSEKOLAH');
+    const iNAMA = idx('NAMASEKOLAH');
+    const iLOKASI = idx('LOKASI');
+    const iGRED = idx('GRED');
+    const iSESI = idx('SESI');
+    const iTEL = idx('NOTELEFON');
+    const iEMAIL = idx('EMAIL');
+    const iENR = idx('ENROLMEN');
+    const iGURU = idx('GURU');
+    const iXX = idx('KOORDINATXX'); // lng
+    const iYY = idx('KOORDINATYY'); // lat
 
-    allData = rows.map(r=>{
-      // ikut header awak
-      const lng = toNum(r["KOORDINATXX"]); // longitude
-      const lat = toNum(r["KOORDINATYY"]); // latitude
+    allData = table.slice(1).map(r => ({
+      negeri: r[iNEGERI] ?? '',
+      ppd: r[iPPD] ?? '',
+      jenis: r[iJENIS] ?? '',
+      kod: r[iKOD] ?? '',
+      nama: r[iNAMA] ?? '',
+      lokasi: r[iLOKASI] ?? '-',
+      gred: r[iGRED] ?? '-',
+      sesi: r[iSESI] ?? '-',
+      tel: r[iTEL] ?? 'TIADA',
+      email: r[iEMAIL] ?? '-',
+      enrolmen: toNum(r[iENR]),
+      guru: toNum(r[iGURU]),
+      lng: toNum(r[iXX]),
+      lat: toNum(r[iYY]),
+    })).filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng));
 
-      const obj = {
-        negeri: (r["NEGERI"]||'').trim(),
-        ppd: (r["PPD"]||'').trim(),
-        jenis: (r["JENIS/LABEL"]||'').trim(),
-        kod: (r["KODSEKOLAH"]||'').trim(),
-        nama: (r["NAMASEKOLAH"]||'').trim(),
-        lat, lng
-      };
-
-      return obj;
-    }).filter(s=>{
-      const ok = Number.isFinite(s.lat) && Number.isFinite(s.lng) && isInMalaysia(s.lat, s.lng);
-      if(!ok) dropped++;
-      return ok;
-    });
-
-    window.__droppedCount = dropped;
-
-    initFilters();
-    applyFilter(true);
+    initFilters(allData);
+    drawMarkers(allData, true);
   }
 
-  // events
-  elNegeri.addEventListener('change', updatePPD);
-  elPPD.addEventListener('change', ()=>applyFilter(true));
-  elJenis.addEventListener('change', ()=>applyFilter(true));
-  elQ.addEventListener('input', ()=>applyFilter(false));
-  document.getElementById('btnReset').addEventListener('click', resetAll);
-
-  loadData().catch(err=>{
-    console.error(err);
-    document.getElementById('statText').textContent = 'RALAT DATA';
-    alert(err.message || String(err));
-  });
+  // mula
+  (async ()=>{
+    try{
+      await loadCSV();
+    }catch(e){
+      document.getElementById('statText').textContent = 'RALAT: ' + (e.message || e);
+      console.error(e);
+    }
+  })();
 </script>
 
 </body>
