@@ -1,3 +1,9 @@
+html‎
++10
+-6
+Lines changed: 10 additions & 6 deletions
+Original file line number	Diff line number	Diff line change
+@@ -1,570 +1,574 @@
 <!DOCTYPE html>
 <html lang="ms">
 <head>
@@ -131,11 +137,16 @@
   </header>
 
   <!-- Stats -->
+  <div class="bg-white border-b border-slate-200 px-4 py-2 text-xs font-bold">
+    <div class="max-w-7xl mx-auto flex flex-wrap gap-6">
+      <div>Jumlah: <span id="sTotal" class="font-black">0</span></div>
+      <div>Rendah: <span id="sSR" class="font-black">0</span></div>
+      <div>Menengah: <span id="sSM" class="font-black">0</span></div>
+    </div>
   <div class="max-w-7xl mx-auto flex flex-wrap gap-6">
   <div>Jumlah Sekolah: <span id="sTotal" class="font-black">0</span></div>
   <div>Rendah: <span id="sSR" class="font-black">0</span></div>
   <div>Menengah: <span id="sSM" class="font-black">0</span></div>
-
   <!-- ✅ TAMBAHAN MURID -->
   <div>Murid Rendah: <span id="sMuridSR" class="font-black">0</span></div>
   <div>Murid Menengah: <span id="sMuridSM" class="font-black">0</span></div>
@@ -335,26 +346,15 @@
   }
 
   function updateStats(list){
-  const total = list.length;
-  const smList = list.filter(isMenengah);
-  const srList = list.filter(s => !isMenengah(s));
+    const total = list.length;
+    const sm = list.filter(isMenengah).length;
+    const sr = total - sm;
 
-  const sm = smList.length;
-  const sr = srList.length;
-
-  const muridSM = smList.reduce((t,s)=> t + Number(s.enrolmen || 0), 0);
-  const muridSR = srList.reduce((t,s)=> t + Number(s.enrolmen || 0), 0);
-
-  document.getElementById('sTotal').textContent = total;
-  document.getElementById('sSM').textContent = sm;
-  document.getElementById('sSR').textContent = sr;
-
-  document.getElementById('sMuridSM').textContent = muridSM.toLocaleString();
-  document.getElementById('sMuridSR').textContent = muridSR.toLocaleString();
-
-  document.getElementById('statText').textContent = `${total} SEKOLAH DITEMUI`;
-}
-
+    document.getElementById('sTotal').textContent = total;
+    document.getElementById('sSM').textContent = sm;
+    document.getElementById('sSR').textContent = sr;
+    document.getElementById('statText').textContent = `${total} SEKOLAH DITEMUI`;
+  }
 
   function drawMarkers(list, autoZoom){
     clusters.clearLayers();
@@ -576,11 +576,3 @@
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
