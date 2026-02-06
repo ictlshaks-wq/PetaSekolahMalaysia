@@ -1,581 +1,477 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ms">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Peta Digital Sekolah Malaysia</title>
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- MarkerCluster -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
   <style>
-    :root{
-      --bg:#f6f7fb;
-      --card:#ffffff;
-      --text:#0f172a;
-      --muted:#64748b;
-      --line:#e5e7eb;
-      --primary:#4f46e5;
-      --shadow: 0 10px 30px rgba(15,23,42,.10);
-      --radius:18px;
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
+    #map { height: calc(100vh - 160px); }
+
+    /* ✅ KECILKAN SEDIKIT KOTAK TOOLTIP (TANPA UBAH MAKLUMAT) */
+    .school-label{
+      background: rgba(255,255,255,.92);
+      border: 1px solid #cbd5e1;
+
+      /* asal: padding 2px 6px */
+      padding: 1px 5px;
+
+      /* asal: radius 8px */
+      border-radius: 7px;
+
+      /* asal: font-size 10px */
+      font-size: 9px;
+
+      /* (kekal bold macam asal) */
+      font-weight: 900;
+
+      white-space: nowrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,.12);
+      text-transform: uppercase;
+
+      /* ✅ kecilkan ketinggian baris supaya kotak lebih nipis */
+      line-height: 1.1;
     }
 
-    /* Top bar */
-    .top{
-      position:sticky; top:0; z-index:999;
-      background: linear-gradient(180deg, #fff 0%, rgba(255,255,255,.85) 100%);
-      backdrop-filter: blur(10px);
-      border-bottom:1px solid var(--line);
+    .m-card{
+      width: 38px; height: 38px;
+      border-radius: 12px;
+      background: #fff;
+      display:flex; align-items:center; justify-content:center;
+      box-shadow: 0 12px 24px rgba(0,0,0,.18);
+      border: 1px solid rgba(0,0,0,.06);
     }
-    .wrap{max-width:1100px;margin:0 auto;padding:14px 14px;}
-    .header{
-      display:flex; align-items:center; gap:12px;
-      margin-bottom:10px;
+    .m-ring{
+      width: 32px; height: 32px;
+      border-radius: 10px;
+      border: 2px solid;
+      display:flex; align-items:center; justify-content:center;
+      color: inherit;
+      font-size: 18px;
+      font-weight: 900;
     }
-    .logo{
-      width:44px;height:44px;border-radius:14px;
-      background: #eef2ff;
-      display:grid;place-items:center;
-      border:1px solid #e0e7ff;
-      flex:0 0 auto;
+    #infoPanel{
+      position:absolute;
+      z-index: 1200;
+      top: 84px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 460px;
+      max-width: calc(100vw - 28px);
     }
-    .logo span{font-size:22px}
-    .title{
-      display:flex; flex-direction:column; line-height:1.1;
+    @media (max-width: 640px){
+      #infoPanel{ top: 126px; width: calc(100vw - 20px); }
+      #map { height: calc(100vh - 200px); }
     }
-    .title b{font-size:18px}
-    .title small{
-      color: var(--primary);
-      font-weight:800;
-      letter-spacing:.08em;
-      text-transform:uppercase;
-      margin-top:4px;
-    }
-
-    .filters{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:10px;
-    }
-    @media(min-width:780px){
-      .filters{grid-template-columns: 1fr 1fr 1fr 1.3fr auto;}
-    }
-
-    .control{
-      background: var(--card);
-      border:1px solid var(--line);
-      border-radius: 999px;
-      padding:10px 12px;
-      box-shadow: 0 8px 18px rgba(15,23,42,.06);
-      display:flex; align-items:center; gap:8px;
-      min-height:44px;
-    }
-    select, input{
-      width:100%;
-      border:none;
-      outline:none;
-      background:transparent;
-      font-size:14px;
-      color: var(--text);
-    }
-    input::placeholder{color:#94a3b8}
-    .btn{
-      border:none;
-      outline:none;
-      cursor:pointer;
-      border-radius:999px;
-      padding:10px 14px;
-      min-height:44px;
-      background:#f1f5f9;
-      border:1px solid var(--line);
-      font-weight:700;
-      box-shadow: 0 8px 18px rgba(15,23,42,.06);
-      white-space:nowrap;
-    }
-    .stats{
-      margin-top:10px;
-      font-weight:800;
-      color:#0f172a;
-      display:flex;
-      gap:14px;
-      flex-wrap:wrap;
-      justify-content:flex-start;
-      padding-bottom:6px;
-    }
-    .stats span{
-      color:#0f172a;
-    }
-    .stats b{
-      color:#0f172a;
-    }
-    .muted{color:var(--muted); font-weight:700}
-
-    /* Map */
-    #map{
-      width:100%;
-      height: calc(100vh - 170px);
-    }
-    @media(min-width:780px){
-      #map{height: calc(100vh - 160px);}
-    }
-
-    /* ====== POPUP COMPACT ====== */
-    .school-popup{
-      max-width:300px; /* ✅ kecilkan sikit */
-      padding:12px 14px;
-      font-size:13px;
-      line-height:1.4;
-      border-radius:12px;
-    }
-    .school-popup .head{
-      display:flex; align-items:flex-start; gap:10px;
-      margin-bottom:8px;
-    }
-    .school-popup .badge{
-      width:38px;height:38px;border-radius:12px;
-      background:#eef2ff;
-      border:1px solid #e0e7ff;
-      display:grid;place-items:center;
-      flex:0 0 auto;
-      font-size:18px;
-    }
-    .school-popup h3{
-      font-size:15px;
-      font-weight:800;
-      margin:0;
-      line-height:1.2;
-    }
-    .school-popup .sub{
-      margin-top:4px;
-      color:#64748b;
-      font-weight:700;
-      font-size:12px;
-    }
-    .school-popup .grid{
-      margin-top:10px;
-      display:grid;
-      grid-template-columns: 1fr;
-      gap:0;
-    }
-    .school-popup .row{
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      padding:4px 0;
-      border-bottom:1px solid #e5e7eb;
-    }
-    .school-popup .row:last-child{border-bottom:none}
-    .school-popup .label{
-      font-size:11px;
-      color:#64748b;
-      text-transform:uppercase;
-      letter-spacing:.04em;
-      flex:0 0 44%;
-    }
-    .school-popup .value{
-      font-size:13px;
-      font-weight:600;
-      text-align:right;
-      flex:1;
-      word-break:break-word;
-    }
-
-    /* Leaflet popup tweak (paksa kecil) */
-    .leaflet-popup-content{
-      margin:10px 12px;
-      width:300px !important;
-      max-width:300px !important;
-    }
-    @media (max-width:420px){
-      .leaflet-popup-content{
-        width:270px !important;
-        max-width:270px !important;
-      }
-    }
-
-    .leaflet-popup-content-wrapper{
-      border-radius:16px;
-      box-shadow: var(--shadow);
-    }
-    .leaflet-popup-tip{
-      box-shadow: var(--shadow);
+    #loading{
+      position: fixed; inset: 0;
+      z-index: 3000;
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      background: rgba(255,255,255,.96);
     }
   </style>
 </head>
 
-<body>
-  <div class="top">
-    <div class="wrap">
-      <div class="header">
-        <div class="logo"><span>🏫</span></div>
-        <div class="title">
-          <b>PETA DIGITAL SEKOLAH MALAYSIA</b>
-          <small id="foundCount">0 SEKOLAH DITEMUI</small>
-        </div>
+<body class="bg-slate-50 h-screen overflow-hidden flex flex-col">
+
+  <!-- Loading -->
+  <div id="loading">
+    <div class="relative">
+      <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-600"></div>
+      <div class="absolute inset-0 flex items-center justify-center">
+        <div class="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black">🏫</div>
       </div>
-
-      <div class="filters">
-        <div class="control">
-          <select id="filterNegeri">
-            <option value="">Semua Negeri</option>
-          </select>
-        </div>
-
-        <div class="control">
-          <select id="filterPPD">
-            <option value="">Semua PPD</option>
-          </select>
-        </div>
-
-        <div class="control">
-          <select id="filterJenis">
-            <option value="">Semua Jenis</option>
-          </select>
-        </div>
-
-        <div class="control">
-          <input id="searchBox" type="text" placeholder="Cari nama / kod..." />
-        </div>
-
-        <button class="btn" id="btnReset">Reset</button>
-      </div>
-
-      <div class="stats">
-        <span><span class="muted">Jumlah:</span> <b id="statJumlah">0</b></span>
-        <span><span class="muted">Rendah:</span> <b id="statRendah">0</b></span>
-        <span><span class="muted">Menengah:</span> <b id="statMenengah">0</b></span>
-      </div>
+    </div>
+    <div id="loadingText" class="mt-5 text-xs font-black tracking-[0.22em] uppercase text-slate-600">
+      Memuatkan data sekolah...
     </div>
   </div>
 
-  <div id="map"></div>
+  <!-- Error -->
+  <div id="err" class="hidden fixed top-3 left-1/2 -translate-x-1/2 z-[3100] bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-xl shadow">
+    Ralat
+  </div>
 
-  <script>
-    /**
-     * =========================
-     * 1) TETAPKAN SUMBER DATA (CSV)
-     * =========================
-     * CSV mesti ada header.
-     * Minimum lajur disyorkan:
-     * nama,kod,negeri,ppd,peringkat,jenis,gred,sesi,telefon,fax,emel,prasekolah,enrolmen_prasekolah,lat,lng
-     */
-    const DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4hR_b6YVHOkWpeWvFVdFYKXLAVeYUOoaDd310UMc6dtXPVq9NuJaIEdU3hEzjgoLk34vaBu9afFCm/pub?output=csv"; // ✅ tukar ke CSV
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 shadow-sm px-4 py-3">
+    <div class="max-w-7xl mx-auto flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow font-black">🏫</div>
+        <div>
+          <div class="font-black tracking-tight uppercase text-slate-900">Peta Digital Sekolah Malaysia</div>
+          <div id="statText" class="text-[11px] font-black text-indigo-600 uppercase tracking-widest">Memuatkan...</div>
+        </div>
+      </div>
 
-    // ====== 2) MAP INIT ======
-    const map = L.map("map", { zoomControl: true }).setView([4.2105, 101.9758], 6);
+      <div class="flex flex-wrap gap-2 items-center justify-end">
+        <select id="fNegeri" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50" onchange="updatePPD()">
+          <option value="">Semua Negeri</option>
+        </select>
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
+        <select id="fPPD" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50" onchange="applyFilter(true)">
+          <option value="">Semua PPD</option>
+        </select>
 
-    const cluster = L.markerClusterGroup({
-      showCoverageOnHover: false,
-      spiderfyDistanceMultiplier: 1.2,
-      maxClusterRadius: 55
-    });
-    map.addLayer(cluster);
+        <select id="fJenis" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50" onchange="applyFilter(true)">
+          <option value="">Semua Jenis</option>
+        </select>
 
-    // ====== 3) STATE ======
-    let allSchools = [];
-    let markers = []; // { marker, data }
+        <input id="q" class="text-[11px] font-bold border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50 w-56"
+               placeholder="Cari nama / kod..." oninput="applyFilter(false)" />
 
-    const elNegeri = document.getElementById("filterNegeri");
-    const elPPD   = document.getElementById("filterPPD");
-    const elJenis = document.getElementById("filterJenis");
-    const elSearch= document.getElementById("searchBox");
-    const elReset = document.getElementById("btnReset");
+        <button class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white text-[11px] font-black transition"
+                onclick="resetAll()" title="Reset">
+          Reset
+        </button>
+      </div>
+    </div>
+  </header>
 
-    const foundCount = document.getElementById("foundCount");
-    const statJumlah = document.getElementById("statJumlah");
-    const statRendah = document.getElementById("statRendah");
-    const statMenengah = document.getElementById("statMenengah");
+  <!-- Stats -->
+  <div class="bg-white border-b border-slate-200 px-4 py-2 text-xs font-bold">
+    <div class="max-w-7xl mx-auto flex flex-wrap gap-6">
+      <div>Jumlah: <span id="sTotal" class="font-black">0</span></div>
+      <div>Rendah: <span id="sSR" class="font-black">0</span></div>
+      <div>Menengah: <span id="sSM" class="font-black">0</span></div>
+    </div>
+  </div>
 
-    // ====== 4) POPUP (kekal + tambah enrolmen prasekolah) ======
-    function createPopup(s){
-      const sub = `${(s.kod || "-")} • ${(s.jenis || "-")}`;
-      const enrolPra =
-        (s.enrolmen_prasekolah ?? s.enrolmenPrasekolah ?? s.enrol_prasekolah ?? s.prasekolah_enrol);
-
-      return `
-        <div class="school-popup">
-          <div class="head">
-            <div class="badge">🏫</div>
+  <main class="relative flex-1">
+    <!-- Info Panel -->
+    <div id="infoPanel" class="hidden">
+      <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+        <div class="p-4 flex items-start justify-between gap-3 border-b border-slate-50">
+          <div class="flex items-start gap-3">
+            <div id="ipBadge" class="w-11 h-11 rounded-2xl flex items-center justify-center text-white font-black shadow"
+                 style="background:#2563eb">🏫</div>
             <div>
-              <h3>${escapeHtml(s.nama || "-")}</h3>
-              <div class="sub">${escapeHtml(sub)}</div>
+              <div id="ipNama" class="font-black text-slate-900 text-sm uppercase leading-tight">-</div>
+              <div id="ipSub" class="text-[11px] text-slate-500 font-bold">-</div>
             </div>
           </div>
+          <button onclick="hideInfo()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white transition flex items-center justify-center font-black">✕</button>
+        </div>
 
-          <div class="grid">
-            <div class="row"><span class="label">Negeri</span><span class="value">${escapeHtml(s.negeri || "-")}</span></div>
-            <div class="row"><span class="label">PPD</span><span class="value">${escapeHtml(s.ppd || "-")}</span></div>
-            <div class="row"><span class="label">Peringkat</span><span class="value">${escapeHtml(s.peringkat || "-")}</span></div>
-            <div class="row"><span class="label">Jenis</span><span class="value">${escapeHtml(s.jenis || "-")}</span></div>
-            <div class="row"><span class="label">Kod</span><span class="value">${escapeHtml(s.kod || "-")}</span></div>
-            <div class="row"><span class="label">Gred / Lokasi</span><span class="value">${escapeHtml(s.gred || "-")}</span></div>
-            <div class="row"><span class="label">Sesi</span><span class="value">${escapeHtml(s.sesi || "-")}</span></div>
-            <div class="row"><span class="label">Telefon</span><span class="value">${escapeHtml(s.telefon || "-")}</span></div>
-            <div class="row"><span class="label">Fax</span><span class="value">${escapeHtml(s.fax || "Tiada")}</span></div>
-            <div class="row"><span class="label">Emel</span><span class="value">${escapeHtml(s.emel || "-")}</span></div>
+        <div class="p-4">
+          <div class="grid grid-cols-1 gap-2 text-[11px]">
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">NEGERI</span><span id="ipNegeri" class="font-black">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">PPD</span><span id="ipPPD" class="font-black">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">PERINGKAT</span><span id="ipPeringkat" class="font-black">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">JENIS</span><span id="ipJenis" class="font-black">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">KOD</span><span id="ipKod" class="font-black">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">GRED / LOKASI</span><span id="ipGredLok" class="font-black text-indigo-600">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">SESI</span><span id="ipSesi" class="font-black">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">TELEFON</span><span id="ipTel" class="font-black">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">FAX</span><span id="ipFax" class="font-black">-</span></div>
+            <div class="flex flex-col border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">EMEL</span><span id="ipEmail" class="font-black text-blue-600 truncate">-</span></div>
+            <div class="flex justify-between border-b border-slate-50 pb-1"><span class="text-slate-400 font-bold">ENROLMEN</span><span id="ipEnrol" class="font-black">-</span></div>
+            <div class="flex justify-between"><span class="text-slate-400 font-bold">GURU</span><span id="ipGuru" class="font-black">-</span></div>
+          </div>
 
-            <div class="row"><span class="label">Prasekolah</span><span class="value">${escapeHtml(s.prasekolah || "Tiada")}</span></div>
-
-            <!-- ✅ TAMBAHAN: ENROLMEN PRASEKOLAH -->
-            <div class="row"><span class="label">Enrolmen Prasekolah</span><span class="value">${escapeHtml((enrolPra ?? "-"))}</span></div>
+          <div class="flex gap-2 mt-4">
+            <button id="ipFokus" class="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl text-[11px] font-black uppercase shadow hover:bg-indigo-700 active:scale-95 transition">
+              Fokus Lokasi
+            </button>
+            <a id="ipNav" href="#" target="_blank" class="flex-1 text-center bg-slate-900 text-white py-2.5 rounded-xl text-[11px] font-black uppercase shadow hover:bg-black active:scale-95 transition">
+              Navigasi Peta
+            </a>
           </div>
         </div>
-      `;
-    }
+      </div>
+    </div>
 
-    function escapeHtml(str){
-      return String(str)
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-    }
+    <div id="map" class="w-full h-full"></div>
+  </main>
 
-    // ====== 5) CSV PARSER (tanpa library) ======
-    function parseCSV(text){
-      // parser ringkas, support "quoted field" dan comma dalam quotes
-      const rows = [];
-      let row = [];
-      let cur = "";
-      let inQuotes = false;
+<script>
+  // =====================
+  // 1) TUKAR LINK CSV DI SINI
+  // =====================
+  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4hR_b6YVHOkWpeWvFVdFYKXLAVeYUOoaDd310UMc6dtXPVq9NuJaIEdU3hEzjgoLk34vaBu9afFCm/pub?output=csv"; // contoh: https://docs.google.com/spreadsheets/d/e/.../pub?output=csv
 
-      for(let i=0;i<text.length;i++){
-        const ch = text[i];
-        const next = text[i+1];
+  // ===== helpers
+  function showLoading(on, text){
+    const el = document.getElementById('loading');
+    if (typeof text === 'string') document.getElementById('loadingText').textContent = text;
+    el.style.display = on ? 'flex' : 'none';
+  }
+  function showError(msg){
+    const el = document.getElementById('err');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    setTimeout(()=>el.classList.add('hidden'), 5500);
+  }
 
-        if(ch === '"' ){
-          if(inQuotes && next === '"'){ // escaped quote
-            cur += '"';
-            i++;
-          }else{
-            inQuotes = !inQuotes;
-          }
-          continue;
-        }
+  // ===== map
+  const map = L.map('map', { zoomControl:false, wheelPxPerZoomLevel:60 }).setView([4.2, 102.0], 7);
+  L.control.zoom({ position:'bottomright' }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap' }).addTo(map);
 
-        if(ch === "," && !inQuotes){
-          row.push(cur);
-          cur = "";
-          continue;
-        }
+  const clusters = L.markerClusterGroup({ spiderfyOnMaxZoom:true, showCoverageOnHover:false, maxClusterRadius:50, disableClusteringAtZoom:15 });
+  map.addLayer(clusters);
 
-        if((ch === "\n" || ch === "\r") && !inQuotes){
-          if(ch === "\r" && next === "\n") i++;
-          row.push(cur);
-          rows.push(row);
-          row = [];
-          cur = "";
-          continue;
-        }
+  // ===== data
+  let allData = [];
+  let negeriMap = {}; // negeri -> Set(ppd)
 
-        cur += ch;
-      }
+  // ===== CSV parser yang betul (support comma dalam teks + quote)
+  function parseCSV(text){
+    const rows = [];
+    let row = [], cur = "", inQuotes = false;
 
-      // last cell
-      if(cur.length > 0 || row.length > 0){
-        row.push(cur);
-        rows.push(row);
-      }
+    for (let i=0; i<text.length; i++){
+      const c = text[i];
+      const n = text[i+1];
 
-      // buang baris kosong
-      return rows.filter(r => r.some(c => String(c).trim() !== ""));
-    }
-
-    function csvToObjects(csvText){
-      const table = parseCSV(csvText);
-      if(table.length === 0) return [];
-      const headers = table[0].map(h => String(h).trim());
-
-      const out = [];
-      for(let i=1;i<table.length;i++){
-        const r = table[i];
-        const o = {};
-        headers.forEach((h,idx)=>{
-          o[h] = (r[idx] ?? "").toString().trim();
-        });
-        out.push(o);
-      }
-      return out;
-    }
-
-    // ====== 6) LOAD DATA (CSV) ======
-    async function loadData(){
-      try{
-        const res = await fetch(DATA_URL, { cache: "no-store" });
-        if(!res.ok) throw new Error("Gagal muat data. Semak DATA_URL & hosting path.");
-        const csvText = await res.text();
-
-        allSchools = csvToObjects(csvText);
-
-        // normalisasi numeric lat/lng (CSV = string)
-        allSchools = allSchools.map(s => ({
-          ...s,
-          lat: Number(s.lat),
-          lng: Number(s.lng),
-          enrolmen_prasekolah: (s.enrolmen_prasekolah === "" ? null : s.enrolmen_prasekolah)
-        }));
-
-        buildFilters(allSchools);
-        buildMarkers(allSchools);
-        applyFilters(); // render awal
-      }catch(err){
-        alert("Ralat: " + err.message);
-        console.error(err);
+      if (c === '"' ){
+        if (inQuotes && n === '"'){ cur += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if (c === ',' && !inQuotes){
+        row.push(cur); cur = "";
+      } else if ((c === '\n' || c === '\r') && !inQuotes){
+        if (c === '\r' && n === '\n') i++;
+        row.push(cur); cur = "";
+        if (row.length > 1) rows.push(row);
+        row = [];
+      } else {
+        cur += c;
       }
     }
+    row.push(cur);
+    if (row.length > 1) rows.push(row);
 
-    // ====== 7) BUILD FILTER OPTIONS ======
-    function uniqSorted(arr){
-      return [...new Set(arr.filter(v => v !== null && v !== undefined && String(v).trim() !== "").map(v => String(v).trim()))]
-        .sort((a,b)=> a.localeCompare(b, "ms"));
-    }
+    const header = rows.shift().map(h => (h||"").trim());
+    return rows.map(r=>{
+      const obj = {};
+      header.forEach((h, idx)=> obj[h] = (r[idx] ?? "").trim());
+      return obj;
+    });
+  }
 
-    function buildFilters(list){
-      const negeriList = uniqSorted(list.map(s => s.negeri));
-      const jenisList  = uniqSorted(list.map(s => s.jenis));
+  function num(v){
+    const s = String(v ?? "").trim();
+    if (!s) return NaN;
+    return Number(s.replace(",", ".")); // jaga jika ada decimal comma
+  }
 
-      // negeri
-      negeriList.forEach(n=>{
-        const opt = document.createElement("option");
-        opt.value = n; opt.textContent = n;
-        elNegeri.appendChild(opt);
-      });
+  // ===== logik rendah/menengah
+  function isMenengah(s){
+    const peringkat = String(s.peringkat||"").toUpperCase();
+    if (peringkat.includes("MENENGAH")) return true;
+    const jenis = String(s.jenis||"").toUpperCase();
+    if (jenis.includes("SM") || jenis.includes("SMK") || jenis.includes("SBP") || jenis.includes("KV") || jenis.includes("SMA") || jenis.includes("TEKNIK")) return true;
+    const nama = String(s.nama||"").toUpperCase();
+    return nama.includes("MENENGAH") || nama.includes("SMK") || nama.includes("KV") || nama.includes("SMA") || nama.includes("TEKNIK");
+  }
 
-      // jenis
-      jenisList.forEach(j=>{
-        const opt = document.createElement("option");
-        opt.value = j; opt.textContent = j;
-        elJenis.appendChild(opt);
-      });
+  // ===== ikon (bentuk sekolah) + warna biru/merah
+  function makeIcon(color, emoji){
+    return L.divIcon({
+      className:'',
+      html:`<div class="m-card"><div class="m-ring" style="border-color:${color};color:${color}">${emoji}</div></div>`,
+      iconSize:[38,38],
+      iconAnchor:[19,19]
+    });
+  }
 
-      // PPD akan dibina ikut negeri (dinamik)
-      refreshPPDOptions(list, "");
-    }
+  function clearSelectExceptFirst(sel){
+    while(sel.options.length>1) sel.remove(1);
+  }
 
-    function refreshPPDOptions(list, negeriValue){
-      elPPD.innerHTML = `<option value="">Semua PPD</option>`;
+  function initFilters(data){
+    negeriMap = {};
+    const negeriSet = new Set();
+    const jenisSet = new Set();
 
-      const filtered = negeriValue ? list.filter(s => String(s.negeri||"") === negeriValue) : list;
-      const ppds = uniqSorted(filtered.map(s => s.ppd));
+    data.forEach(s=>{
+      const negeri = String(s.negeri||'').trim();
+      const ppd = String(s.ppd||'').trim();
+      const jenis = String(s.jenis||'').trim();
 
-      ppds.forEach(p=>{
-        const opt = document.createElement("option");
-        opt.value = p; opt.textContent = p;
-        elPPD.appendChild(opt);
-      });
-    }
-
-    // ====== 8) BUILD MARKERS ======
-    function buildMarkers(list){
-      cluster.clearLayers();
-      markers = [];
-
-      list.forEach(s=>{
-        const lat = Number(s.lat);
-        const lng = Number(s.lng);
-        if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-        const m = L.marker([lat, lng]);
-
-        // ✅ kecilkan maxWidth sikit (asal 340)
-        m.bindPopup(createPopup(s), { maxWidth: 300, closeButton: true });
-
-        markers.push({ marker: m, data: s });
-      });
-    }
-
-    // ====== 9) APPLY FILTERS ======
-    function normalize(t){ return String(t||"").toLowerCase().trim(); }
-
-    function applyFilters(){
-      const negeri = elNegeri.value;
-      const ppd    = elPPD.value;
-      const jenis  = elJenis.value;
-      const q      = normalize(elSearch.value);
-
-      const visible = markers.filter(({data:s})=>{
-        if(negeri && String(s.negeri||"") !== negeri) return false;
-        if(ppd && String(s.ppd||"") !== ppd) return false;
-        if(jenis && String(s.jenis||"") !== jenis) return false;
-
-        if(q){
-          const hay = normalize([
-            s.nama, s.kod, s.negeri, s.ppd, s.jenis, s.peringkat
-          ].join(" "));
-          if(!hay.includes(q)) return false;
-        }
-        return true;
-      });
-
-      cluster.clearLayers();
-      visible.forEach(v => cluster.addLayer(v.marker));
-
-      const total = visible.length;
-      const rendah = visible.filter(v => normalize(v.data.peringkat).includes("rendah")).length;
-      const menengah = visible.filter(v => normalize(v.data.peringkat).includes("menengah")).length;
-
-      foundCount.textContent = `${total} SEKOLAH DITEMUI`;
-      statJumlah.textContent = total;
-      statRendah.textContent = rendah;
-      statMenengah.textContent = menengah;
-
-      if(total > 0){
-        const group = L.featureGroup(visible.map(v => v.marker));
-        const b = group.getBounds();
-        if(b.isValid()){
-          map.fitBounds(b.pad(0.15), { animate: true });
-        }
+      if(negeri){
+        negeriSet.add(negeri);
+        if(!negeriMap[negeri]) negeriMap[negeri] = new Set();
+        if(ppd) negeriMap[negeri].add(ppd);
       }
-    }
-
-    // ====== 10) EVENTS ======
-    elNegeri.addEventListener("change", ()=>{
-      refreshPPDOptions(allSchools, elNegeri.value);
-      elPPD.value = "";
-      applyFilters();
+      if(jenis) jenisSet.add(jenis);
     });
 
-    elPPD.addEventListener("change", applyFilters);
-    elJenis.addEventListener("change", applyFilters);
+    const fNegeri = document.getElementById('fNegeri');
+    const fPPD = document.getElementById('fPPD');
+    const fJenis = document.getElementById('fJenis');
 
-    let searchTimer=null;
-    elSearch.addEventListener("input", ()=>{
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(applyFilters, 180);
+    clearSelectExceptFirst(fNegeri);
+    clearSelectExceptFirst(fPPD);
+    clearSelectExceptFirst(fJenis);
+
+    [...negeriSet].sort().forEach(n => fNegeri.add(new Option(n,n)));
+    [...jenisSet].sort().forEach(j => fJenis.add(new Option(j,j)));
+
+    updatePPD();
+  }
+
+  function updatePPD(){
+    const negeri = document.getElementById('fNegeri').value;
+    const fPPD = document.getElementById('fPPD');
+    clearSelectExceptFirst(fPPD);
+
+    if(negeri && negeriMap[negeri]){
+      [...negeriMap[negeri]].sort().forEach(p => fPPD.add(new Option(p,p)));
+    }
+    applyFilter(true);
+  }
+
+  function updateStats(list){
+    const total = list.length;
+    const sm = list.filter(isMenengah).length;
+    const sr = total - sm;
+
+    document.getElementById('sTotal').textContent = total;
+    document.getElementById('sSM').textContent = sm;
+    document.getElementById('sSR').textContent = sr;
+    document.getElementById('statText').textContent = `${total} SEKOLAH DITEMUI`;
+  }
+
+  function drawMarkers(list, autoZoom){
+    clusters.clearLayers();
+    updateStats(list);
+
+    const bounds = [];
+    list.forEach(s=>{
+      const lat = Number(s.lat), lng = Number(s.lng);
+      if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+      const sm = isMenengah(s);
+      const color = sm ? '#dc2626' : '#2563eb'; // 🔴 / 🔵
+      const emoji = '🏫'; // bentuk sekolah, bukan bulat
+      const m = L.marker([lat,lng], { icon: makeIcon(color, emoji) });
+
+      // label
+      m.bindTooltip(String(s.nama||''), { permanent:true, direction:'top', className:'school-label', offset:[0,-16] });
+
+      // klik -> panel info
+      m.on('click', ()=>showInfo(s, lat, lng, color, sm));
+      clusters.addLayer(m);
+      bounds.push([lat,lng]);
     });
 
-    elReset.addEventListener("click", ()=>{
-      elNegeri.value = "";
-      refreshPPDOptions(allSchools, "");
-      elPPD.value = "";
-      elJenis.value = "";
-      elSearch.value = "";
-      buildMarkers(allSchools);
-      applyFilters();
-      map.setView([4.2105, 101.9758], 6);
+    if(autoZoom && bounds.length) map.fitBounds(bounds, { padding:[60,60] });
+  }
+
+  function showInfo(s, lat, lng, color, sm){
+    document.getElementById('infoPanel').classList.remove('hidden');
+
+    const badge = document.getElementById('ipBadge');
+    badge.style.background = color;
+    badge.textContent = sm ? '🎓' : '🏫';
+
+    document.getElementById('ipNama').textContent = String(s.nama||'-');
+    document.getElementById('ipSub').textContent = `${String(s.kod||'-')} • ${String(s.jenis||'-')}`;
+
+    document.getElementById('ipNegeri').textContent = String(s.negeri||'-');
+    document.getElementById('ipPPD').textContent = String(s.ppd||'-');
+    document.getElementById('ipPeringkat').textContent = String(s.peringkat||'-');
+    document.getElementById('ipJenis').textContent = String(s.jenis||'-');
+    document.getElementById('ipKod').textContent = String(s.kod||'-');
+
+    document.getElementById('ipGredLok').textContent = `${String(s.gred||'-')} / ${String(s.lokasi||'-')}`;
+    document.getElementById('ipSesi').textContent = String(s.sesi||'-');
+
+    document.getElementById('ipTel').textContent = String(s.tel||'-');
+    document.getElementById('ipFax').textContent = String(s.fax||'-');
+    document.getElementById('ipEmail').textContent = String(s.email||'-');
+
+    document.getElementById('ipEnrol').textContent = String(s.enrolmen ?? '-');
+    document.getElementById('ipGuru').textContent = String(s.guru ?? '-');
+
+    document.getElementById('ipFokus').onclick = () => map.flyTo([lat, lng], 16, { animate:true, duration:1.2 });
+    document.getElementById('ipNav').href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  }
+  function hideInfo(){ document.getElementById('infoPanel').classList.add('hidden'); }
+
+  function applyFilter(autoZoom){
+    const negeri = document.getElementById('fNegeri').value;
+    const ppd = document.getElementById('fPPD').value;
+    const jenis = document.getElementById('fJenis').value;
+    const q = document.getElementById('q').value.trim().toLowerCase();
+
+    const filtered = allData.filter(s=>{
+      const okN = !negeri || String(s.negeri||'').trim() === negeri;
+      const okP = !ppd || String(s.ppd||'').trim() === ppd;
+      const okJ = !jenis || String(s.jenis||'').trim() === jenis;
+      const okQ = !q || String(s.nama||'').toLowerCase().includes(q) || String(s.kod||'').toLowerCase().includes(q);
+      return okN && okP && okJ && okQ;
     });
 
-    // ====== START ======
-    loadData();
-  </script>
+    drawMarkers(filtered, !!autoZoom);
+  }
+
+  function resetAll(){
+    document.getElementById('fNegeri').value = '';
+    document.getElementById('fPPD').value = '';
+    document.getElementById('fJenis').value = '';
+    document.getElementById('q').value = '';
+    hideInfo();
+    updatePPD();
+  }
+
+  // ===== LOAD (CSV Google Sheet)
+  async function loadCSV(){
+    try{
+      showLoading(true,'Memuatkan data sekolah (Google Sheet)...');
+
+      const res = await fetch(CSV_URL + (CSV_URL.includes('?') ? '&' : '?') + '_=' + Date.now(), { cache:'no-store' });
+      if(!res.ok) throw new Error('Gagal fetch CSV: ' + res.status);
+
+      const txt = await res.text();
+      const rows = parseCSV(txt);
+      if(!Array.isArray(rows) || rows.length === 0) throw new Error('CSV kosong / tidak dapat dibaca');
+
+      // Map ikut header tuan (NEGERI, PPD, JENIS/LABEL, ...)
+      allData = rows.map(r => ({
+        negeri: r["NEGERI"] || "",
+        ppd: r["PPD"] || "",
+        peringkat: r["PERINGKAT"] || "",
+        jenis: r["JENIS/LABEL"] || "",
+        kod: r["KODSEKOLAH"] || "",
+        nama: r["NAMASEKOLAH"] || "",
+
+        lokasi: r["LOKASI"] || "-",
+        gred: r["GRED"] || "-",
+        sesi: r["SESI"] || "-",
+        tel: r["NOTELEFON"] || "-",
+        fax: r["NOFAX"] || "-",
+        email: r["EMAIL"] || "-",
+
+        enrolmen: r["ENROLMEN"] || "-",
+        guru: r["GURU"] || "-",
+
+        lng: num(r["KOORDINATXX"]),
+        lat: num(r["KOORDINATYY"])
+      }))
+      .filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng));
+
+      initFilters(allData);
+      drawMarkers(allData, true);
+
+      showLoading(false);
+    }catch(e){
+      showLoading(false);
+      showError(e.message || String(e));
+    }
+  }
+
+  window.onload = loadCSV;
+</script>
 </body>
 </html>
