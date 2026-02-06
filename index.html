@@ -16,38 +16,17 @@
 
   <style>
     #map { height: calc(100vh - 160px); }
-
-    /* ✅ KECILKAN SEDIKIT KOTAK TOOLTIP (TANPA UBAH MAKLUMAT) */
     .school-label{
       background: rgba(255,255,255,.92);
       border: 1px solid #cbd5e1;
-
-      /* asal: padding 2px 6px */
-      padding: 1px 5px;
-
-      /* asal: radius 8px */
-      border-radius: 7px;
-
-      /* asal: font-size 10px */
-      font-size: 9px;
-
-      /* (kekal bold macam asal) */
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 10px;
       font-weight: 900;
-
       white-space: nowrap;
       box-shadow: 0 2px 10px rgba(0,0,0,.12);
       text-transform: uppercase;
-
-      /* ✅ kecilkan ketinggian baris supaya kotak lebih nipis */
-      line-height: 1.1;
-/* Tooltip hanya muncul bila zoom dekat */
-.leaflet-zoom-animated .school-label{
-  opacity: 0;
-  transform: scale(0.85);
-  transition: .25s ease;
-}      
     }
-
     .m-card{
       width: 38px; height: 38px;
       border-radius: 12px;
@@ -128,7 +107,14 @@
           <option value="">Semua PPD</option>
         </select>
 
-        <select id="fJenis" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50" onchange="applyFilter(true)">
+        <!-- ✅ TAMBAHAN: FILTER SENARAI NAMA SEKOLAH (MUNCUL BILA PPD DIPILIH) -->
+        <select id="fSekolah"
+                class="hidden text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50 w-72"
+                onchange="pickSchool()">
+          <option value="">Pilih Sekolah</option>
+        </select>
+
+        <select id="fJenis" class="text-[11px] font-black border-2 border-slate-100 rounded-xl px-3 py-2 bg-slate-50" onchange="updateSchoolList();applyFilter(true)">
           <option value="">Semua Jenis</option>
         </select>
 
@@ -230,6 +216,9 @@
   let allData = [];
   let negeriMap = {}; // negeri -> Set(ppd)
 
+  // ✅ TAMBAHAN: index untuk cari sekolah cepat (ikut kod)
+  let schoolIndex = new Map(); // kod -> data sekolah
+
   // ===== CSV parser yang betul (support comma dalam teks + quote)
   function parseCSV(text){
     const rows = [];
@@ -286,7 +275,7 @@
       className:'',
       html:`<div class="m-card"><div class="m-ring" style="border-color:${color};color:${color}">${emoji}</div></div>`,
       iconSize:[38,38],
-      iconAnchor:[19,19]
+      iconAnchor:[38/2,38/2]
     });
   }
 
@@ -334,6 +323,10 @@
     if(negeri && negeriMap[negeri]){
       [...negeriMap[negeri]].sort().forEach(p => fPPD.add(new Option(p,p)));
     }
+
+    // ✅ TAMBAHAN: bina senarai sekolah bila PPD/negeri berubah
+    updateSchoolList();
+
     applyFilter(true);
   }
 
@@ -427,8 +420,78 @@
     document.getElementById('fPPD').value = '';
     document.getElementById('fJenis').value = '';
     document.getElementById('q').value = '';
+
+    // ✅ TAMBAHAN: reset dropdown sekolah
+    const fSekolah = document.getElementById('fSekolah');
+    fSekolah.value = '';
+    updateSchoolList();
+
     hideInfo();
     updatePPD();
+  }
+
+  // ================================
+  // ✅ TAMBAHAN: FILTER SENARAI SEKOLAH IKUT PPD
+  // ================================
+  function updateSchoolList(){
+    const negeri = document.getElementById('fNegeri').value;
+    const ppd = document.getElementById('fPPD').value;
+    const jenis = document.getElementById('fJenis').value;
+    const sel = document.getElementById('fSekolah');
+
+    // kalau PPD belum dipilih -> sorok
+    if(!ppd){
+      sel.classList.add('hidden');
+      sel.value = '';
+      clearSelectExceptFirst(sel);
+      return;
+    }
+
+    // papar bila PPD dipilih
+    sel.classList.remove('hidden');
+    clearSelectExceptFirst(sel);
+
+    // ambil sekolah ikut negeri/ppd/jenis (tanpa q)
+    const list = allData.filter(s=>{
+      const okN = !negeri || String(s.negeri||'').trim() === negeri;
+      const okP = String(s.ppd||'').trim() === ppd;
+      const okJ = !jenis || String(s.jenis||'').trim() === jenis;
+      return okN && okP && okJ;
+    });
+
+    // susun ikut nama
+    list.sort((a,b)=> String(a.nama||'').localeCompare(String(b.nama||''), 'ms'));
+
+    list.forEach(s=>{
+      const kod = String(s.kod||'').trim();
+      const nama = String(s.nama||'').trim();
+      const value = kod || nama; // fallback jika kod kosong
+      const label = kod ? `${nama} (${kod})` : nama;
+      sel.add(new Option(label, value));
+    });
+  }
+
+  function pickSchool(){
+    const sel = document.getElementById('fSekolah');
+    const key = sel.value;
+    if(!key) return;
+
+    // cari data sekolah (utamakan kod)
+    let s = schoolIndex.get(key);
+    if(!s){
+      s = allData.find(x => String(x.kod||'').trim() === key) ||
+          allData.find(x => String(x.nama||'').trim() === key);
+    }
+    if(!s) return;
+
+    const lat = Number(s.lat), lng = Number(s.lng);
+    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    const sm = isMenengah(s);
+    const color = sm ? '#dc2626' : '#2563eb';
+
+    map.flyTo([lat, lng], 16, { animate:true, duration:1.1 });
+    showInfo(s, lat, lng, color, sm);
   }
 
   // ===== LOAD (CSV Google Sheet)
@@ -467,8 +530,18 @@
       }))
       .filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng));
 
+      // ✅ TAMBAHAN: bina index sekolah ikut kod
+      schoolIndex = new Map();
+      allData.forEach(s=>{
+        const kod = String(s.kod||'').trim();
+        if(kod) schoolIndex.set(kod, s);
+      });
+
       initFilters(allData);
       drawMarkers(allData, true);
+
+      // ✅ TAMBAHAN: pastikan dropdown sekolah ikut status semasa
+      updateSchoolList();
 
       showLoading(false);
     }catch(e){
@@ -481,5 +554,3 @@
 </script>
 </body>
 </html>
-
-
