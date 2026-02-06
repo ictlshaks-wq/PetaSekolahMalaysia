@@ -335,15 +335,26 @@
   }
 
   function updateStats(list){
-    const total = list.length;
-    const sm = list.filter(isMenengah).length;
-    const sr = total - sm;
+  const total = list.length;
+  const smList = list.filter(isMenengah);
+  const srList = list.filter(s => !isMenengah(s));
 
-    document.getElementById('sTotal').textContent = total;
-    document.getElementById('sSM').textContent = sm;
-    document.getElementById('sSR').textContent = sr;
-    document.getElementById('statText').textContent = `${total} SEKOLAH DITEMUI`;
-  }
+  const sm = smList.length;
+  const sr = srList.length;
+
+  const muridSM = smList.reduce((t,s)=> t + Number(s.enrolmen || 0), 0);
+  const muridSR = srList.reduce((t,s)=> t + Number(s.enrolmen || 0), 0);
+
+  document.getElementById('sTotal').textContent = total;
+  document.getElementById('sSM').textContent = sm;
+  document.getElementById('sSR').textContent = sr;
+
+  document.getElementById('sMuridSM').textContent = muridSM.toLocaleString();
+  document.getElementById('sMuridSR').textContent = muridSR.toLocaleString();
+
+  document.getElementById('statText').textContent = `${total} SEKOLAH DITEMUI`;
+}
+
 
   function drawMarkers(list, autoZoom){
     clusters.clearLayers();
@@ -565,6 +576,7 @@
 </script>
 </body>
 </html>
+
 
 
 
